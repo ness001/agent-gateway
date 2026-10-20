@@ -76,7 +76,7 @@ jobs:
         run: node scripts/bundle-budget.mjs --strict
       - name: Package VSIX
         run: pnpm exec vsce package --no-dependencies -o agent-gateway.vsix
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: agent-gateway-vsix
           path: agent-gateway.vsix
