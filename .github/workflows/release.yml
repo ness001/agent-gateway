@@ -17,7 +17,7 @@ jobs:
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Tests are not rerun here: a tag is released only if CI passed on
       # that exact commit (Windows, Linux and macOS).
       - name: Require a passing CI run for this commit
