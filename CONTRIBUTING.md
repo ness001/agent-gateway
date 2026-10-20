@@ -85,6 +85,9 @@ A request flows: `gateway/app.ts` (auth, model resolution) → `protocol/index.t
   `protocol/core/log.ts`.
 - **No secrets or personal data** in commits, fixtures or docs: no API keys,
   tokens, internal registry URLs or user names and home paths.
+- **Lockfile.** `pnpm-lock.yaml` must not contain `tarball:` URLs (CI
+  checks). If your registry adds them, remove them before committing:
+  `sed -i -E 's/, tarball: [^}]*\}/}/' pnpm-lock.yaml`.
 - **Bundle budget.** `dist/extension.cjs` stays under 450 KB.
 - **Style.** Prettier and ESLint as configured; match the surrounding code.
 

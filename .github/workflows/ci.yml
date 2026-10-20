@@ -28,6 +28,13 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Lockfile has no registry-specific tarball URLs
+        shell: bash
+        run: |
+          if grep -n "tarball:" pnpm-lock.yaml; then
+            echo "::error::pnpm-lock.yaml records tarball URLs; strip them before committing"
+            exit 1
+          fi
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Type check

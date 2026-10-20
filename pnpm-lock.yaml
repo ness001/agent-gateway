@@ -43,8 +43,8 @@ importers:
         specifier: ^0.0.10
         version: 0.0.10
       '@vscode/test-electron':
-        specifier: ^2.5.2
-        version: 2.5.2
+        specifier: ^3.1.0
+        version: 3.1.0
       '@vscode/vsce':
         specifier: ^3.7.0
         version: 3.9.2
@@ -594,9 +594,9 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@vscode/test-electron@2.5.2':
-    resolution: {integrity: sha1-99QHjoIwzpyUMi8qKcwWwXlUCF0=}
-    engines: {node: '>=16'}
+  '@vscode/test-electron@3.1.0':
+    resolution: {integrity: sha1-Rrk9EY3NOzyJyq4pahP5p/XrY8U=}
+    engines: {node: '>=22'}
 
   '@vscode/vsce-sign-alpine-arm64@2.0.6':
     resolution: {integrity: sha1-LNJEyvXo7FQ/QvuR1N87kzZByPo=}
@@ -2723,7 +2723,7 @@ snapshots:
       supports-color: 9.4.0
       yargs: 17.7.3
 
-  '@vscode/test-electron@2.5.2':
+  '@vscode/test-electron@3.1.0':
     dependencies:
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
