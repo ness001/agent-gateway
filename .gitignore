@@ -1,0 +1,18 @@
+# Dependencies and build output
+node_modules/
+dist/
+out/
+.vscode-test/
+*.vsix
+
+# Local test outputs
+src/test/fixtures/wire/*.local.json
+test-live/soak/results/*
+!test-live/soak/results/.gitkeep
+test-live/contracts/out/
+*.log
+*.agent-gateway-*.bak
+
+# Editor and OS files
+.DS_Store
+Thumbs.db

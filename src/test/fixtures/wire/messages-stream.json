@@ -1,0 +1,25 @@
+{
+  "case": "messages-stream",
+  "method": "POST",
+  "path": "/v1/messages",
+  "status": 200,
+  "headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive"
+  },
+  "durationMs": 655,
+  "sse": {
+    "events": [
+      "message_start",
+      "content_block_start",
+      "content_block_delta",
+      "content_block_stop",
+      "message_delta",
+      "message_stop"
+    ],
+    "text": "pong",
+    "count": 6
+  }
+}

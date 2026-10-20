@@ -1,0 +1,21 @@
+{
+  "case": "chat-invalid",
+  "method": "POST",
+  "path": "/v1/chat/completions",
+  "status": 400,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "mvf5lxoo-c",
+    "connection": "keep-alive"
+  },
+  "durationMs": 8,
+  "body": {
+    "error": {
+      "message": "Request body must be a JSON object.",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": null
+    },
+    "request_id": "mvf5lxoo-c"
+  }
+}

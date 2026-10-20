@@ -1,0 +1,28 @@
+{
+  "case": "responses-stream",
+  "method": "POST",
+  "path": "/v1/responses",
+  "status": 200,
+  "headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive"
+  },
+  "durationMs": 690,
+  "sse": {
+    "events": [
+      "response.created",
+      "response.in_progress",
+      "response.output_item.added",
+      "response.content_part.added",
+      "response.output_text.delta",
+      "response.output_text.done",
+      "response.content_part.done",
+      "response.output_item.done",
+      "response.completed"
+    ],
+    "text": "pong",
+    "count": 9
+  }
+}

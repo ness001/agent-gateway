@@ -1,0 +1,23 @@
+{
+  "case": "chat-stream",
+  "method": "POST",
+  "path": "/v1/chat/completions",
+  "status": 200,
+  "headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "x-request-id": "mvf5lt6y-5",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive"
+  },
+  "durationMs": 658,
+  "sse": {
+    "events": [
+      "chat.completion.chunk",
+      "chat.completion.chunk:finish=stop",
+      "[DONE]"
+    ],
+    "text": "pong",
+    "count": 4
+  }
+}

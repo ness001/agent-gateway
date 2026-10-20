@@ -1,0 +1,43 @@
+{
+  "case": "responses-tool-single",
+  "method": "POST",
+  "path": "/v1/responses",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "connection": "keep-alive"
+  },
+  "durationMs": 880,
+  "body": {
+    "id": "resp_AM-1792232176210-dqdy4jwo",
+    "object": "response",
+    "status": "completed",
+    "created_at": 1792232176,
+    "model": "claude-sonnet-5.5",
+    "output": [
+      {
+        "type": "function_call",
+        "id": "fc_AM-8zrd062sffbi",
+        "call_id": "toolu_0187pgaBJstBUe194r1xMhNi",
+        "name": "get_weather",
+        "arguments": "{\"city\":\"Paris\"}",
+        "status": "completed"
+      }
+    ],
+    "error": null,
+    "incomplete_details": null,
+    "usage": {
+      "input_tokens": 705,
+      "input_tokens_details": {
+        "cached_tokens": 701,
+        "cache_write_tokens": 0
+      },
+      "output_tokens": 50,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 755
+    },
+    "metadata": {}
+  }
+}

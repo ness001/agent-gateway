@@ -1,0 +1,48 @@
+{
+  "case": "responses-nonstream",
+  "method": "POST",
+  "path": "/v1/responses",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "connection": "keep-alive"
+  },
+  "durationMs": 691,
+  "body": {
+    "id": "resp_AM-1792232174635-77hld91g",
+    "object": "response",
+    "status": "completed",
+    "created_at": 1792232174,
+    "model": "claude-sonnet-5.5",
+    "output": [
+      {
+        "type": "message",
+        "id": "msg_AM-u8o74c71ga0v",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "pong",
+            "annotations": []
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "error": null,
+    "incomplete_details": null,
+    "usage": {
+      "input_tokens": 349,
+      "input_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "output_tokens": 4,
+      "output_tokens_details": {
+        "reasoning_tokens": 0
+      },
+      "total_tokens": 353
+    },
+    "metadata": {}
+  }
+}

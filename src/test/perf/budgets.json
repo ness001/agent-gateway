@@ -1,0 +1,5 @@
+{
+  "startup": { "requireP95Ms": 400, "activateToHealthP95Ms": 500 },
+  "small": { "requestP95Ms": 25, "chunkP95Ms": 3, "nonStreamP95Ms": 60 },
+  "large": { "requestP95Ms": 150, "chunkP95Ms": 3, "nonStreamP95Ms": 200 }
+}

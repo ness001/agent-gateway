@@ -1,0 +1,38 @@
+{
+  "case": "messages-nonstream",
+  "method": "POST",
+  "path": "/v1/messages",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "connection": "keep-alive"
+  },
+  "durationMs": 661,
+  "body": {
+    "id": "msg_1792232182706",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5.5",
+    "container": null,
+    "content": [
+      {
+        "type": "text",
+        "text": "pong",
+        "citations": null
+      }
+    ],
+    "stop_details": null,
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "cache_creation": null,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "inference_geo": null,
+      "input_tokens": 349,
+      "output_tokens": 4,
+      "server_tool_use": null,
+      "service_tier": null
+    }
+  }
+}

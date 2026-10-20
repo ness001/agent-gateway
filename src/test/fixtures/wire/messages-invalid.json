@@ -1,0 +1,17 @@
+{
+  "case": "messages-invalid",
+  "method": "POST",
+  "path": "/v1/messages",
+  "status": 500,
+  "headers": {
+    "content-type": "application/json",
+    "connection": "keep-alive"
+  },
+  "durationMs": 4,
+  "body": {
+    "error": {
+      "message": "Cannot read properties of undefined (reading 'map')",
+      "type": "internal_server_error"
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "client": "kilo",
+  "version": "7.8.9",
+  "result": {
+    "status": "ok",
+    "exit": 0,
+    "fixed": true
+  },
+  "endpoints": {
+    "POST /v1/chat/completions": {
+      "body.paths": [
+        "$:object",
+        "max_tokens:number",
+        "messages:array",
+        "messages[].cache_control.type:string",
+        "messages[].cache_control:object",
+        "messages[].content:array",
+        "messages[].content:null",
+        "messages[].content:string",
+        "messages[].content[].cache_control.type:string",
+        "messages[].content[].cache_control:object",
+        "messages[].content[].text:string",
+        "messages[].content[].type:string",
+        "messages[].content[]:object",
+        "messages[].role:string",
+        "messages[].tool_call_id:string",
+        "messages[].tool_calls:array",
+        "messages[].tool_calls[].cache_control.type:string",
+        "messages[].tool_calls[].cache_control:object",
+        "messages[].tool_calls[].function.arguments:string",
+        "messages[].tool_calls[].function.name:string",
+        "messages[].tool_calls[].function:object",
+        "messages[].tool_calls[].id:string",
+        "messages[].tool_calls[].type:string",
+        "messages[].tool_calls[]:object",
+        "messages[]:object",
+        "model:string",
+        "stream:boolean",
+        "stream_options.include_usage:boolean",
+        "stream_options:object",
+        "tool_choice:string",
+        "tools:array",
+        "tools[].function.description:string",
+        "tools[].function.name:string",
+        "tools[].function.parameters:object",
+        "tools[].function:object",
+        "tools[].type:string",
+        "tools[]:object"
+      ],
+      "header:content-type": [
+        "application/json"
+      ],
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "http-referer",
+        "user-agent",
+        "x-session-affinity",
+        "x-session-id",
+        "x-title"
+      ],
+      "model": [
+        "claude-sonnet-5.5"
+      ],
+      "role": [
+        "assistant",
+        "system",
+        "tool",
+        "user"
+      ],
+      "sse": [
+        "data.object:chat.completion.chunk",
+        "data:[DONE]"
+      ],
+      "status": [
+        "200"
+      ],
+      "stream": [
+        "true"
+      ],
+      "tool_choice": [
+        "auto"
+      ],
+      "tools.type": [
+        "function"
+      ],
+      "type@messages[].cache_control": [
+        "ephemeral"
+      ],
+      "type@messages[].content[]": [
+        "text"
+      ],
+      "type@messages[].content[].cache_control": [
+        "ephemeral"
+      ],
+      "type@messages[].tool_calls[]": [
+        "function"
+      ],
+      "type@messages[].tool_calls[].cache_control": [
+        "ephemeral"
+      ],
+      "type@tools[]": [
+        "function"
+      ]
+    }
+  }
+}

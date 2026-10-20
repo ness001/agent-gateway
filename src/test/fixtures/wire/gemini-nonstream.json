@@ -1,0 +1,36 @@
+{
+  "case": "gemini-nonstream",
+  "method": "POST",
+  "path": "/v1beta/models/claude-sonnet-5.5:generateContent",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "mvf5md9i-z",
+    "connection": "keep-alive"
+  },
+  "durationMs": 708,
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "text": "pong"
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 349,
+      "candidatesTokenCount": 4,
+      "cachedContentTokenCount": 0,
+      "thoughtsTokenCount": 0,
+      "totalTokenCount": 353
+    },
+    "modelVersion": "claude-sonnet-5.5"
+  }
+}

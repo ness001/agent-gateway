@@ -1,0 +1,154 @@
+{
+  "client": "hermes",
+  "version": "0.19.0",
+  "result": {
+    "status": "ok",
+    "exit": 0,
+    "fixed": true
+  },
+  "endpoints": {
+    "GET /api/tags": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "404"
+      ]
+    },
+    "GET /api/v1/models": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "404"
+      ]
+    },
+    "GET /props": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "404"
+      ]
+    },
+    "GET /v1/models": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "200"
+      ]
+    },
+    "GET /v1/props": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "404"
+      ]
+    },
+    "GET /version": {
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "user-agent"
+      ],
+      "status": [
+        "404"
+      ]
+    },
+    "POST /v1/chat/completions": {
+      "body.paths": [
+        "$:object",
+        "max_tokens:number",
+        "messages:array",
+        "messages[].content:string",
+        "messages[].name:string",
+        "messages[].role:string",
+        "messages[].tool_call_id:string",
+        "messages[].tool_calls:array",
+        "messages[].tool_calls[].function.arguments:string",
+        "messages[].tool_calls[].function.name:string",
+        "messages[].tool_calls[].function:object",
+        "messages[].tool_calls[].id:string",
+        "messages[].tool_calls[].type:string",
+        "messages[].tool_calls[]:object",
+        "messages[]:object",
+        "model:string",
+        "stream:boolean",
+        "stream_options.include_usage:boolean",
+        "stream_options:object",
+        "tools:array",
+        "tools[].function.description:string",
+        "tools[].function.name:string",
+        "tools[].function.parameters:object",
+        "tools[].function:object",
+        "tools[].type:string",
+        "tools[]:object"
+      ],
+      "header:content-type": [
+        "application/json"
+      ],
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "user-agent",
+        "x-stainless-arch",
+        "x-stainless-async",
+        "x-stainless-lang",
+        "x-stainless-os",
+        "x-stainless-package-version",
+        "x-stainless-read-timeout",
+        "x-stainless-retry-count",
+        "x-stainless-runtime",
+        "x-stainless-runtime-version"
+      ],
+      "model": [
+        "claude-sonnet-5.5"
+      ],
+      "role": [
+        "assistant",
+        "system",
+        "tool",
+        "user"
+      ],
+      "sse": [
+        "data.object:chat.completion.chunk",
+        "data:[DONE]"
+      ],
+      "status": [
+        "200"
+      ],
+      "stream": [
+        "true"
+      ],
+      "tools.type": [
+        "function"
+      ],
+      "type@messages[].tool_calls[]": [
+        "function"
+      ],
+      "type@tools[]": [
+        "function"
+      ]
+    }
+  }
+}

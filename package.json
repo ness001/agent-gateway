@@ -1,0 +1,317 @@
+{
+  "name": "agent-gateway",
+  "displayName": "Agent Gateway",
+  "description": "Use your GitHub Copilot models in any agent through one local gateway, share them across machines, and enable web search, compatible with all tool calls. Works with Claude Code, Codex, Gemini CLI, Antigravity CLI, Kilo Code, Cline, DeepSeek Harness, Pi, Oh My Pi, Hermes and OpenClaw.",
+  "version": "0.1.0",
+  "publisher": "ness001",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "preview": true,
+  "homepage": "https://github.com/ness001/agent-gateway#readme",
+  "bugs": {
+    "url": "https://github.com/ness001/agent-gateway/issues"
+  },
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ness001/agent-gateway.git"
+  },
+  "engines": {
+    "vscode": "^1.140.0",
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "categories": [
+    "AI"
+  ],
+  "keywords": [
+    "copilot",
+    "github copilot",
+    "gateway",
+    "llm gateway",
+    "claude code",
+    "codex",
+    "gemini cli",
+    "openclaw",
+    "hermes",
+    "antigravity",
+    "kilo code",
+    "cline",
+    "deepseek",
+    "pi",
+    "anthropic api",
+    "openai api",
+    "dev tunnel",
+    "remote models",
+    "web search",
+    "coding agents"
+  ],
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [],
+  "contributes": {
+    "configuration": {
+      "title": "Agent Gateway",
+      "properties": {
+        "agentGateway.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the local gateway."
+        },
+        "agentGateway.port": {
+          "type": "integer",
+          "default": 24444,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Loopback listener port. Development builds always use 24445."
+        },
+        "agentGateway.logLevel": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "default": "info",
+          "description": "Gateway log level."
+        },
+        "agentGateway.remoteUpstreams": {
+          "type": "array",
+          "default": [],
+          "description": "Named remote gateways, usually reached through dev tunnels. Remote models are advertised as {name}--{modelId}.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "url"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "url": {
+                "type": "string",
+                "description": "HTTP(S) origin without path, query, fragment, or credentials."
+              }
+            }
+          }
+        },
+        "agentGateway.webSearch.provider": {
+          "type": "string",
+          "enum": [
+            "none",
+            "exa",
+            "firecrawl",
+            "tavily",
+            "jina",
+            "you"
+          ],
+          "enumDescriptions": [
+            "Off: web-search requests fail and no search service is contacted.",
+            "Exa: works without a key (rate-limited); a key raises the limits.",
+            "Firecrawl: works without a key (rate-limited); a key raises the limits.",
+            "Tavily: requires an API key.",
+            "Jina AI Search: requires an API key.",
+            "You.com: requires an API key."
+          ],
+          "default": "none",
+          "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Web Search and Fetch** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."
+        },
+        "agentGateway.webSearch.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Model for Gemini hosted-search side requests whose requested model does not exist (Gemini CLI's `google_web_search` asks for its own internal model). Empty uses the model aliases: the best local Gemini Flash model, else the Astra fallback."
+        },
+        "agentGateway.modelAliases": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "Requested model -> local model ID, for every protocol. Built-in defaults map the internal names of Gemini CLI and Antigravity CLI (`gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-3.1-flash-lite-preview` -> best local Gemini Flash model; `gemini-3-pro-preview`, `gemini-2.5-pro` -> best local Gemini Pro model; else the fallback model) when that name has no route. An empty string disables a default. Substitutions are logged and reported in the `x-agent-gateway-model-fallback` header; aliases are not listed in `/v1/models`."
+        },
+        "agentGateway.fallbackModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Model used when an agent requests a model name your Copilot account doesn't offer (Gemini requests excepted). Empty: `gpt-6-astra` if your model list has it, otherwise the request fails. If the model named here is not available, `gpt-6-astra` is used instead. A matching `agentGateway.modelAliases` entry takes precedence. **Status** shows the fallback model in use."
+        },
+        "agentGateway.webSearch.maxSearchesPerRequest": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "markdownDescription": "Most provider searches one hosted web-search request may run (Anthropic, OpenAI Responses and Gemini). A lower `max_uses` (Anthropic) or `max_tool_calls` (Responses) in the request wins. Searches the model asks for in one turn run in parallel; extra calls get a limit error so the model answers with what it has."
+        },
+        "agentGateway.internal.strictProtocol": {
+          "type": "boolean",
+          "default": true,
+          "included": false,
+          "description": "Internal/testing only: strict protocol validation in the new protocol core. Not for normal use."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "agentGateway.showStatus",
+        "title": "Status",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.restart",
+        "title": "Restart Gateway",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.changePort",
+        "title": "Change Port",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setFallbackModel",
+        "title": "Set Fallback Model",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.configureClients",
+        "title": "Configure Coding Agents",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setWebSearchEngine",
+        "title": "Web Search and Fetch",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.shareViaDevTunnel",
+        "title": "Share Gateway via Dev Tunnel",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.manageRemoteUpstreams",
+        "title": "Manage Remote Upstreams",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setApiKey",
+        "title": "Set Gateway API Key",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setRemoteApiKey",
+        "title": "Set Remote Upstream API Key",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.copyHealth",
+        "title": "Copy Health Details",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.openErrorLog",
+        "title": "Open Gateway Error Log",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.addRemoteUpstream",
+        "title": "Add Remote Upstream",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.removeRemoteUpstream",
+        "title": "Remove Remote Upstream",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.unconfigureClients",
+        "title": "Remove Gateway From Coding Agents",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setWebSearchApiKey",
+        "title": "Set Web Search Engine",
+        "category": "Agent Gateway"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "agentGateway.setApiKey",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setRemoteApiKey",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.copyHealth",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.openErrorLog",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.addRemoteUpstream",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.removeRemoteUpstream",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.unconfigureClients",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setWebSearchApiKey",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "pnpm run check-types && node esbuild.js",
+    "build:prod": "rimraf dist && pnpm run check-types && node esbuild.js --production",
+    "build:dev-variant": "rimraf dist && pnpm run check-types && node esbuild.js --production --dev-variant",
+    "build-tests": "tsc -p tsconfig.test.json && node -e \"require('fs').writeFileSync('out/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\"",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "package": "vsce package --no-dependencies",
+    "package:dev": "node scripts/package-dev.mjs",
+    "publish:vsce": "vsce publish --no-dependencies",
+    "publish:ovsx": "ovsx publish --no-dependencies",
+    "perf": "pnpm run build-tests && vscode-test --grep Performance"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.17.1",
+    "hono": "^4.8.9",
+    "jsonc-parser": "^3.3.1",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "~1.140.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.0",
+    "esbuild": "^0.25.3",
+    "eslint": "^9.25.1",
+    "prettier": "3.5.3",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  }
+}

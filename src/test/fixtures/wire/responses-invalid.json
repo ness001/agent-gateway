@@ -1,0 +1,19 @@
+{
+  "case": "responses-invalid",
+  "method": "POST",
+  "path": "/v1/responses",
+  "status": 400,
+  "headers": {
+    "content-type": "application/json",
+    "connection": "keep-alive"
+  },
+  "durationMs": 12,
+  "body": {
+    "error": {
+      "type": "invalid_request_error",
+      "message": "Either input or instructions is required",
+      "param": "input",
+      "code": "missing_required_parameter"
+    }
+  }
+}

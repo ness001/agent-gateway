@@ -1,0 +1,30 @@
+{
+  "case": "responses-tool-parallel-stream",
+  "method": "POST",
+  "path": "/v1/responses",
+  "status": 200,
+  "headers": {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive"
+  },
+  "durationMs": 1052,
+  "sse": {
+    "events": [
+      "response.created",
+      "response.in_progress",
+      "response.output_item.added",
+      "response.function_call_arguments.delta",
+      "response.function_call_arguments.done",
+      "response.output_item.done",
+      "response.output_item.added",
+      "response.function_call_arguments.delta",
+      "response.function_call_arguments.done",
+      "response.output_item.done",
+      "response.completed"
+    ],
+    "text": "{\"city\":\"Paris\"}{\"city\":\"Tokyo\"}",
+    "count": 11
+  }
+}

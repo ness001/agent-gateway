@@ -1,0 +1,160 @@
+{
+  "client": "codex",
+  "version": "0.163.0-alpha.5",
+  "result": {
+    "status": "ok",
+    "exit": 0,
+    "fixed": true
+  },
+  "endpoints": {
+    "POST /v1/responses": {
+      "body.paths": [
+        "$:object",
+        "client_metadata.root_turn_id:string",
+        "client_metadata.session_id:string",
+        "client_metadata.thread_id:string",
+        "client_metadata.turn_id:string",
+        "client_metadata.x-codex-installation-id:string",
+        "client_metadata.x-codex-turn-metadata:string",
+        "client_metadata.x-codex-window-id:string",
+        "client_metadata:object",
+        "include:array",
+        "include[]:string",
+        "input:array",
+        "input[].call_id:string",
+        "input[].content:array",
+        "input[].content[].text:string",
+        "input[].content[].type:string",
+        "input[].content[]:object",
+        "input[].id:string",
+        "input[].input:string",
+        "input[].name:string",
+        "input[].namespace:string",
+        "input[].output:array",
+        "input[].output[].text:string",
+        "input[].output[].type:string",
+        "input[].output[]:object",
+        "input[].role:string",
+        "input[].status:string",
+        "input[].tools:array",
+        "input[].tools[].description:string",
+        "input[].tools[].name:string",
+        "input[].tools[].tools:array",
+        "input[].tools[].tools[].description:string",
+        "input[].tools[].tools[].format:object",
+        "input[].tools[].tools[].name:string",
+        "input[].tools[].tools[].parameters:object",
+        "input[].tools[].tools[].strict:boolean",
+        "input[].tools[].tools[].type:string",
+        "input[].tools[].tools[]:object",
+        "input[].tools[].type:string",
+        "input[].tools[]:object",
+        "input[].type:string",
+        "input[]:object",
+        "model:string",
+        "parallel_tool_calls:boolean",
+        "prompt_cache_key:string",
+        "reasoning.context:string",
+        "reasoning.effort:string",
+        "reasoning:object",
+        "store:boolean",
+        "stream:boolean",
+        "text.verbosity:string",
+        "text:object",
+        "tool_choice:string"
+      ],
+      "header:content-type": [
+        "application/json"
+      ],
+      "headers": [
+        "accept",
+        "authorization",
+        "content-type",
+        "originator",
+        "session-id",
+        "thread-id",
+        "user-agent",
+        "x-client-request-id",
+        "x-codex-beta-features",
+        "x-codex-turn-metadata",
+        "x-codex-window-id",
+        "x-openai-internal-codex-responses-lite"
+      ],
+      "include": [
+        "reasoning.encrypted_content"
+      ],
+      "model": [
+        "gpt-5.6-sol"
+      ],
+      "reasoning.effort": [
+        "low"
+      ],
+      "role": [
+        "assistant",
+        "developer",
+        "user"
+      ],
+      "sse": [
+        "data.type:response.completed",
+        "data.type:response.content_part.added",
+        "data.type:response.content_part.done",
+        "data.type:response.created",
+        "data.type:response.custom_tool_call_input.delta",
+        "data.type:response.custom_tool_call_input.done",
+        "data.type:response.in_progress",
+        "data.type:response.output_item.added",
+        "data.type:response.output_item.done",
+        "data.type:response.output_text.delta",
+        "data.type:response.output_text.done",
+        "event:response.completed",
+        "event:response.content_part.added",
+        "event:response.content_part.done",
+        "event:response.created",
+        "event:response.custom_tool_call_input.delta",
+        "event:response.custom_tool_call_input.done",
+        "event:response.in_progress",
+        "event:response.output_item.added",
+        "event:response.output_item.done",
+        "event:response.output_text.delta",
+        "event:response.output_text.done"
+      ],
+      "status": [
+        "200"
+      ],
+      "stream": [
+        "true"
+      ],
+      "tool_choice": [
+        "auto"
+      ],
+      "tools.builtin": [
+        "custom:exec"
+      ],
+      "tools.type": [
+        "custom",
+        "function",
+        "namespace"
+      ],
+      "type@input[]": [
+        "additional_tools",
+        "custom_tool_call",
+        "custom_tool_call_output",
+        "message"
+      ],
+      "type@input[].content[]": [
+        "input_text",
+        "output_text"
+      ],
+      "type@input[].output[]": [
+        "input_text"
+      ],
+      "type@input[].tools[]": [
+        "namespace"
+      ],
+      "type@input[].tools[].tools[]": [
+        "custom",
+        "function"
+      ]
+    }
+  }
+}

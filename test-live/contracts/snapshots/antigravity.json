@@ -1,0 +1,78 @@
+{
+  "client": "antigravity",
+  "version": "1.4.3",
+  "result": {
+    "status": "ok",
+    "exit": 0,
+    "fixed": true
+  },
+  "endpoints": {
+    "POST /v1beta/models/{model}:streamGenerateContent": {
+      "body.paths": [
+        "$:object",
+        "contents:array",
+        "contents[].parts:array",
+        "contents[].parts[].functionCall.args:object",
+        "contents[].parts[].functionCall.id:string",
+        "contents[].parts[].functionCall.name:string",
+        "contents[].parts[].functionCall:object",
+        "contents[].parts[].functionResponse:object",
+        "contents[].parts[].text:string",
+        "contents[].parts[]:object",
+        "contents[].role:string",
+        "contents[]:object",
+        "generationConfig.maxOutputTokens:number",
+        "generationConfig.thinkingConfig.includeThoughts:boolean",
+        "generationConfig.thinkingConfig.thinkingBudget:number",
+        "generationConfig.thinkingConfig:object",
+        "generationConfig:object",
+        "systemInstruction.parts:array",
+        "systemInstruction.parts[].text:string",
+        "systemInstruction.parts[]:object",
+        "systemInstruction.role:string",
+        "systemInstruction:object",
+        "tools:array",
+        "tools[].functionDeclarations:array",
+        "tools[].functionDeclarations[].description:string",
+        "tools[].functionDeclarations[].name:string",
+        "tools[].functionDeclarations[].parametersJsonSchema:object",
+        "tools[].functionDeclarations[]:object",
+        "tools[]:object"
+      ],
+      "generationConfig.keys": [
+        "maxOutputTokens",
+        "thinkingConfig"
+      ],
+      "header:content-type": [
+        "application/json"
+      ],
+      "headers": [
+        "accept-encoding",
+        "content-type",
+        "user-agent",
+        "x-goog-api-client",
+        "x-goog-api-key"
+      ],
+      "model": [
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.8-flash"
+      ],
+      "query": [
+        "alt"
+      ],
+      "role": [
+        "model",
+        "user"
+      ],
+      "sse": [
+        "data:candidates"
+      ],
+      "status": [
+        "200"
+      ],
+      "tools.keys": [
+        "functionDeclarations"
+      ]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm run check-types
+      - name: Lint
+        run: pnpm run lint
+      - name: Script tests
+        run: node --test scripts/scripts.test.mjs
+      - name: Build tests
+        run: pnpm run build-tests
+      - name: Build
+        run: pnpm run build
+      - name: Check bundle loads
+        run: node scripts/check-bundle.mjs
+      - name: Get VS Code engine version
+        id: engine
+        shell: bash
+        run: echo "vscode=$(node -p "require('./package.json').engines.vscode")" >> "$GITHUB_OUTPUT"
+      - name: Cache VS Code test download
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ steps.engine.outputs.vscode }}
+      - name: Unit tests (Linux, xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm test
+      - name: Unit tests
+        if: runner.os != 'Linux'
+        run: pnpm test
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Production build
+        run: pnpm run build:prod
+      - name: Bundle budget (450 KB, production bundle)
+        run: node scripts/bundle-budget.mjs --strict
+      - name: Package VSIX
+        run: pnpm exec vsce package --no-dependencies -o agent-gateway.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-gateway-vsix
+          path: agent-gateway.vsix
+          if-no-files-found: error

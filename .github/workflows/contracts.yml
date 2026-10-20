@@ -1,0 +1,66 @@
+name: Client versions
+
+# Weekly check for new coding-agent releases since the committed contract
+# snapshots. The full contract check (test-live/contracts/check.mjs) needs the
+# real clients and a running gateway, so it is run locally; this job only
+# flags when it is due.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compare snapshot versions with published releases
+        id: versions
+        run: |
+          node test-live/contracts/versions.mjs --no-installed --json > versions.json
+          node test-live/contracts/versions.mjs --no-installed > versions.txt
+          cat versions.txt
+          {
+            echo '### Client versions'
+            echo
+            echo '```'
+            cat versions.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "newer=$(node -e "console.log(require('./versions.json').newer.join(','))")" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the tracking issue
+        if: steps.versions.outputs.newer != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEWER: ${{ steps.versions.outputs.newer }}
+        run: |
+          title="New coding agent releases since the contract snapshots"
+          {
+            echo "New releases: \`${NEWER}\`."
+            echo
+            echo '```'
+            cat versions.txt
+            echo '```'
+            echo
+            echo 'Run `node test-live/contracts/check.mjs` locally against a gateway (see CONTRIBUTING.md, "Client contract checks"), adapt the gateway if the contract changed, then update the snapshots with `--update`.'
+          } > body.md
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file body.md
+          else
+            gh issue create --title "$title" --body-file body.md
+          fi

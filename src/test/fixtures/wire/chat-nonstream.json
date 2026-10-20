@@ -1,0 +1,43 @@
+{
+  "case": "chat-nonstream",
+  "method": "POST",
+  "path": "/v1/chat/completions",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "mvf5lso9-4",
+    "connection": "keep-alive"
+  },
+  "durationMs": 669,
+  "body": {
+    "id": "chatcmpl-0001aOCMw62tBqX11EQdyG55",
+    "object": "chat.completion",
+    "created": 1792408270,
+    "model": "claude-sonnet-5.5",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "pong",
+          "refusal": null
+        },
+        "finish_reason": "stop",
+        "logprobs": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 349,
+      "completion_tokens": 4,
+      "total_tokens": 353,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "case": "gemini-tool-single",
+  "method": "POST",
+  "path": "/v1beta/models/claude-sonnet-5.5:generateContent",
+  "status": 200,
+  "headers": {
+    "content-type": "application/json",
+    "x-request-id": "mvf5med0-11",
+    "connection": "keep-alive"
+  },
+  "durationMs": 850,
+  "body": {
+    "candidates": [
+      {
+        "content": {
+          "parts": [
+            {
+              "functionCall": {
+                "id": "toolu_017FZrJYht2xrLwsVK1sFfaC",
+                "name": "get_weather",
+                "args": {
+                  "city": "Paris"
+                }
+              }
+            }
+          ],
+          "role": "model"
+        },
+        "finishReason": "STOP",
+        "index": 0
+      }
+    ],
+    "usageMetadata": {
+      "promptTokenCount": 4,
+      "candidatesTokenCount": 50,
+      "cachedContentTokenCount": 701,
+      "thoughtsTokenCount": 0,
+      "totalTokenCount": 755
+    },
+    "modelVersion": "claude-sonnet-5.5"
+  }
+}

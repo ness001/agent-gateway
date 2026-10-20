@@ -1,0 +1,164 @@
+{
+  "client": "claude-code",
+  "version": "2.1.295",
+  "result": {
+    "status": "ok",
+    "exit": 0,
+    "fixed": true
+  },
+  "endpoints": {
+    "GET /v1/models": {
+      "header:anthropic-version": [
+        "2023-06-01"
+      ],
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "anthropic-version",
+        "authorization",
+        "user-agent"
+      ],
+      "query": [
+        "limit"
+      ],
+      "status": [
+        "200"
+      ]
+    },
+    "POST /v1/messages": {
+      "body.paths": [
+        "$:object",
+        "context_management.edits:array",
+        "context_management.edits[].keep:string",
+        "context_management.edits[].type:string",
+        "context_management.edits[]:object",
+        "context_management:object",
+        "max_tokens:number",
+        "messages:array",
+        "messages[].content:array",
+        "messages[].content:string",
+        "messages[].content[].cache_control.type:string",
+        "messages[].content[].cache_control:object",
+        "messages[].content[].content:string",
+        "messages[].content[].id:string",
+        "messages[].content[].input:object",
+        "messages[].content[].name:string",
+        "messages[].content[].text:string",
+        "messages[].content[].tool_use_id:string",
+        "messages[].content[].type:string",
+        "messages[].content[]:object",
+        "messages[].role:string",
+        "messages[]:object",
+        "metadata:object",
+        "model:string",
+        "output_config.effort:string",
+        "output_config:object",
+        "stream:boolean",
+        "system:array",
+        "system[].cache_control.type:string",
+        "system[].cache_control:object",
+        "system[].text:string",
+        "system[].type:string",
+        "system[]:object",
+        "thinking.display:string",
+        "thinking.type:string",
+        "thinking:object",
+        "tools:array",
+        "tools[].description:string",
+        "tools[].input_schema:object",
+        "tools[].name:string",
+        "tools[]:object"
+      ],
+      "header:anthropic-beta": [
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "prompt-caching-scope-2026-01-05",
+        "thinking-token-count-2026-05-13"
+      ],
+      "header:anthropic-version": [
+        "2023-06-01"
+      ],
+      "header:content-type": [
+        "application/json"
+      ],
+      "headers": [
+        "accept",
+        "accept-encoding",
+        "anthropic-beta",
+        "anthropic-dangerous-direct-browser-access",
+        "anthropic-version",
+        "authorization",
+        "content-type",
+        "user-agent",
+        "x-app",
+        "x-claude-code-session-id",
+        "x-stainless-arch",
+        "x-stainless-lang",
+        "x-stainless-os",
+        "x-stainless-package-version",
+        "x-stainless-retry-count",
+        "x-stainless-runtime",
+        "x-stainless-runtime-version",
+        "x-stainless-timeout"
+      ],
+      "model": [
+        "claude-haiku-5.5"
+      ],
+      "query": [
+        "beta"
+      ],
+      "role": [
+        "assistant",
+        "system",
+        "user"
+      ],
+      "sse": [
+        "data.type:content_block_delta",
+        "data.type:content_block_start",
+        "data.type:content_block_stop",
+        "data.type:message_delta",
+        "data.type:message_start",
+        "data.type:message_stop",
+        "event:content_block_delta",
+        "event:content_block_start",
+        "event:content_block_stop",
+        "event:message_delta",
+        "event:message_start",
+        "event:message_stop"
+      ],
+      "status": [
+        "200"
+      ],
+      "stream": [
+        "true"
+      ],
+      "thinking.type": [
+        "adaptive"
+      ],
+      "type@context_management.edits[]": [
+        "clear_thinking_20251015"
+      ],
+      "type@messages[].content[]": [
+        "text",
+        "tool_result",
+        "tool_use"
+      ],
+      "type@messages[].content[].cache_control": [
+        "ephemeral"
+      ],
+      "type@system[]": [
+        "text"
+      ],
+      "type@system[].cache_control": [
+        "ephemeral"
+      ],
+      "type@thinking": [
+        "adaptive"
+      ]
+    }
+  }
+}
