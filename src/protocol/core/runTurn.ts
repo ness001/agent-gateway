@@ -123,22 +123,28 @@ export async function runTurn<F>(o: RunTurnOptions<F>): Promise<TurnResult> {
 
   let usage: NormalizedUsage | undefined;
   let first = true;
+  const markActivity = (): void => {
+    if (first) {
+      first = false;
+      scope.markFirstChunk();
+    }
+  };
   try {
-    const events = hook.wrap(requestEvents(o, { ...prepared, turns }, scope), {
-      req: o.req,
-      scope,
-      callModel,
-      signal: abort.signal,
-    });
+    const events = hook.wrap(
+      requestEvents(o, { ...prepared, turns }, scope, markActivity),
+      {
+        req: o.req,
+        scope,
+        callModel,
+        signal: abort.signal,
+      },
+    );
     for await (const ev of events) {
       if (scope.reason || sink.cancelled) {
         abort.abort();
         break;
       }
-      if (first) {
-        first = false;
-        scope.markFirstChunk();
-      }
+      markActivity();
       if (ev.e === "end") {
         usage = ev.usage;
       }
@@ -179,6 +185,7 @@ async function* requestEvents<F>(
   o: RunTurnOptions<F>,
   req: CoreRequest,
   scope: TurnScope,
+  onActivity?: () => void,
 ): AsyncIterable<CoreEvent> {
   let current = req;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -204,6 +211,9 @@ async function* requestEvents<F>(
       async function* tracked(): AsyncIterable<unknown> {
         for await (const part of response.stream) {
           // Even an ignored/usage part means the provider has started work.
+          if (!started) {
+            onActivity?.();
+          }
           started = true;
           yield part;
         }

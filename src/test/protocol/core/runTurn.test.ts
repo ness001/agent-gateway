@@ -632,3 +632,29 @@ suite("protocol/core Copilot context budget", () => {
     });
   }
 });
+
+suite("protocol/core first provider activity", () => {
+  test("usage or ignored provider data marks progress before visible output", async () => {
+    for (const first of [
+      usagePart,
+      { mimeType: "internal", data: new Uint8Array() },
+    ]) {
+      const scope = new FakeScope();
+      const model = fakeModel(async function* () {
+        yield first;
+        assert.strictEqual(scope.firstChunk, 1);
+        yield new TextPart("answer");
+        assert.strictEqual(scope.firstChunk, 1);
+      });
+      const result = await runTurn({
+        api,
+        model,
+        req: req(),
+        scope,
+        encoder,
+        sink: new CollectSink<string>(),
+      });
+      assert.strictEqual(result.outcome, "completed");
+    }
+  });
+});

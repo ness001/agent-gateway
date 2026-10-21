@@ -85,15 +85,20 @@ function makeScope(t: FakeTimers, signal?: AbortSignal) {
 }
 
 suite("protocol/http sink and scope", () => {
-  test("first-chunk warning logged once at 20 s with consent hint", () => {
+  test("first-chunk warning reports pending work, not a timeout", () => {
     const t = new FakeTimers();
-    const { scope, warns } = makeScope(t);
+    const { scope, warns, src } = makeScope(t);
     t.advance(19_999);
     assert.strictEqual(warns.length, 0);
     t.advance(1);
     t.advance(60_000);
     assert.strictEqual(warns.length, 1);
     assert.match(warns[0], /^\[rid-1\] anthropic no first chunk after 20 s/);
+    assert.ok(warns[0].includes("still pending"));
+    assert.ok(!warns[0].includes("timed out"));
+    assert.ok(!warns[0].includes("retry"));
+    assert.strictEqual(scope.timeoutError(), undefined);
+    assert.strictEqual(src.token.isCancellationRequested, false);
     scope.dispose();
   });
 
