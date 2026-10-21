@@ -2,12 +2,12 @@ import * as vscode from "vscode";
 
 import type { Gateway } from "../gateway/gateway";
 import type { CatalogEntry } from "../gateway/types";
-import { CONFIG_SECTION } from "../utils/config";
-import { initializeModelMappings } from "./modelMapping";
+import { CONFIG_SECTION, DEFAULT_CONFIG } from "../utils/config";
+import { editModelMapping, initializeModelMappings } from "./modelMapping";
 
 export interface FallbackModelItem {
   label: string;
-  action?: "initializeMappings";
+  action?: "initializeMappings" | "editMapping";
   /** Model ID to save; "" clears the setting. */
   id: string;
   description?: string;
@@ -23,6 +23,7 @@ export function fallbackModelItems(
   models: readonly (Pick<CatalogEntry, "id" | "displayName"> &
     Partial<Pick<CatalogEntry, "remote" | "isAlias">>)[],
   current: { id: string | null; source: "setting" | "default" | null },
+  aliases: Record<string, string> = {},
 ): FallbackModelItem[] {
   const mark = (id: string): string | undefined =>
     current.id === id ? `current (${current.source})` : undefined;
@@ -38,6 +39,18 @@ export function fallbackModelItems(
       action: "initializeMappings",
       description: "Review suggestions for agent default models",
     },
+    ...Object.entries({ ...DEFAULT_CONFIG.modelAliases, ...aliases })
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(
+        ([source, target]): FallbackModelItem => ({
+          label: `$(edit) Mapping: ${source}`,
+          id: source,
+          action: "editMapping",
+          description: target || "(empty — no mapping)",
+          detail:
+            "Choose a different target or clear this mapping. Does not change the fallback.",
+        }),
+      ),
     ...models
       .filter((m) => m.remote === undefined && !m.isAlias)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -56,16 +69,19 @@ export async function setFallbackModel(
   gw: Pick<Gateway, "nativeModels" | "health">,
 ): Promise<void> {
   const models = gw.nativeModels();
-  if (!models.some((m) => m.remote === undefined)) {
-    void vscode.window.showErrorMessage("The gateway has no models yet.");
-    return;
-  }
+  const aliases = vscode.workspace
+    .getConfiguration(CONFIG_SECTION)
+    .get<Record<string, string>>("modelAliases", {});
   const h = gw.health();
   const picked = await vscode.window.showQuickPick(
-    fallbackModelItems(models, {
-      id: h.fallbackModel,
-      source: h.fallbackModelSource,
-    }),
+    fallbackModelItems(
+      models,
+      {
+        id: h.fallbackModel,
+        source: h.fallbackModelSource,
+      },
+      aliases,
+    ),
     {
       title: "Fallback model for unknown model names",
       ignoreFocusOut: true,
@@ -76,6 +92,10 @@ export async function setFallbackModel(
   }
   if (picked.action === "initializeMappings") {
     await initializeModelMappings(gw);
+    return;
+  }
+  if (picked.action === "editMapping") {
+    await editModelMapping(gw, picked.id);
     return;
   }
   await vscode.workspace

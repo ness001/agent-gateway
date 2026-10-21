@@ -213,6 +213,16 @@ suite("commands/status", () => {
       [
         ["", undefined, undefined],
         ["", "Review suggestions for agent default models", undefined],
+        [
+          "claude-haiku-5.5",
+          "(empty — no mapping)",
+          "Choose a different target or clear this mapping. Does not change the fallback.",
+        ],
+        [
+          "claude-sonnet-5",
+          "(empty — no mapping)",
+          "Choose a different target or clear this mapping. Does not change the fallback.",
+        ],
         ["claude-x", undefined, undefined],
         ["gpt-5", "current (setting)", "GPT-5"],
       ],
