@@ -212,10 +212,12 @@ suite("commands/status", () => {
       items.map((i) => [i.id, i.description, i.detail]),
       [
         ["", undefined, undefined],
+        ["", "Review suggestions for agent default models", undefined],
         ["claude-x", undefined, undefined],
         ["gpt-5", "current (setting)", "GPT-5"],
       ],
     );
+    assert.strictEqual(items[1].action, "initializeMappings");
     const def = fallbackModelItems(models, { id: null, source: null });
     assert.strictEqual(def[0].description, "current");
     assert.strictEqual(def[0].label, "Use default (gpt-6-astra if available)");
