@@ -19,6 +19,8 @@ const MANAGED_KEYS = [
   "CLAUDE_CODE_AUTO_MODE_SERVER",
 ] as const;
 const PREVIOUS_KEY = "AGENT_GATEWAY_PREVIOUS";
+const OUTPUT_KEY = "CLAUDE_CODE_MAX_OUTPUT_TOKENS";
+const DEFAULT_OUTPUT_TOKENS = "128000";
 
 function pathApi(platform: NodeJS.Platform): path.PlatformPath {
   return platform === "win32" ? path.win32 : path.posix;
@@ -125,6 +127,29 @@ export const claudeCodeAdapter: ClientAdapter = {
         text = setValue(text, ["env", key], desired[key]);
       }
     }
+    // Record ownership separately so older backups can be upgraded without
+    // replacing their original values, and legacy unconfigure stays safe.
+    const configuredEnv = readEnv(text);
+    let previous: Record<string, unknown> = {};
+    if (typeof configuredEnv[PREVIOUS_KEY] === "string") {
+      const saved: unknown = JSON.parse(configuredEnv[PREVIOUS_KEY]);
+      if (!saved || typeof saved !== "object" || Array.isArray(saved)) {
+        throw new Error(
+          "Claude Code gateway backup is invalid; restore it before configuring.",
+        );
+      }
+      previous = saved as Record<string, unknown>;
+    }
+    if (!(OUTPUT_KEY in previous)) {
+      previous[OUTPUT_KEY] = OUTPUT_KEY in env ? env[OUTPUT_KEY] : null;
+      text = setValue(text, ["env", PREVIOUS_KEY], JSON.stringify(previous));
+    }
+    if (!(OUTPUT_KEY in env)) {
+      text = setValue(text, ["env", OUTPUT_KEY], DEFAULT_OUTPUT_TOKENS);
+    }
+    summary.push(
+      `${OUTPUT_KEY}=${env[OUTPUT_KEY] ?? DEFAULT_OUTPUT_TOKENS} (${OUTPUT_KEY in env ? "preserved existing value" : "gateway default"}).`,
+    );
     summary.push(`If /model does not list gateway models, delete ${cache}.`);
     return {
       changes: text === before ? [] : [{ path: file, before, after: text }],
@@ -160,6 +185,14 @@ export const claudeCodeAdapter: ClientAdapter = {
       } else if (key in env) {
         text = setValue(text, ["env", key], undefined);
       }
+    }
+    // Backups from older versions do not own this setting.
+    if (previous && Object.hasOwn(previous, OUTPUT_KEY)) {
+      text = setValue(
+        text,
+        ["env", OUTPUT_KEY],
+        previous[OUTPUT_KEY] ?? undefined,
+      );
     }
     if (PREVIOUS_KEY in env) {
       text = setValue(text, ["env", PREVIOUS_KEY], undefined);
