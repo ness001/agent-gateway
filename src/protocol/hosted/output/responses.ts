@@ -90,7 +90,9 @@ export function urlCitations(
     let from = 0;
     for (;;) {
       const i = text.indexOf(s.url, from);
-      if (i < 0) break;
+      if (i < 0) {
+        break;
+      }
       out.push({
         type: "url_citation",
         url: s.url,

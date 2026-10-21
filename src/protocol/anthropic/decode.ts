@@ -377,9 +377,15 @@ function decodeTools(v: unknown): DecodedTools {
           wireType: type,
           asTool: true,
         };
-        if (s.maxUses !== undefined) tool.maxUses = s.maxUses;
-        if (s.allowedDomains) tool.allowedDomains = s.allowedDomains;
-        if (s.blockedDomains) tool.blockedDomains = s.blockedDomains;
+        if (s.maxUses !== undefined) {
+          tool.maxUses = s.maxUses;
+        }
+        if (s.allowedDomains) {
+          tool.allowedDomains = s.allowedDomains;
+        }
+        if (s.blockedDomains) {
+          tool.blockedDomains = s.blockedDomains;
+        }
         out.hosted.set(name, { tool, type });
         return;
       }

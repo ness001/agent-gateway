@@ -37,14 +37,20 @@ export function groundingMetadata(
   const sentenceRe = /[^.!?\n]+[.!?]*/g;
   for (const m of answer.matchAll(sentenceRe)) {
     const seg = m[0];
-    if (!seg.trim() || m.index === undefined) continue;
+    if (!seg.trim() || m.index === undefined) {
+      continue;
+    }
     const hits = new Set<number>();
     for (const c of seg.matchAll(/\[(\d{1,3})\]/g)) {
       const n = Number(c[1]) - 1;
-      if (n >= 0 && n < chunks.length) hits.add(n);
+      if (n >= 0 && n < chunks.length) {
+        hits.add(n);
+      }
     }
     for (const c of chunks) {
-      if (seg.includes(c.url)) hits.add(idx(c.url));
+      if (seg.includes(c.url)) {
+        hits.add(idx(c.url));
+      }
     }
     if (hits.size) {
       const start = utf8Len(answer.slice(0, m.index));

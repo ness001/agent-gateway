@@ -8,6 +8,7 @@ import {
   clientActions,
   clientConfigState,
   clientItemDescription,
+  pickedByDefault,
 } from "../../commands/clients";
 import { fallbackModelItems } from "../../commands/fallback";
 import { listeningOn, validatePort } from "../../commands/port";
@@ -333,6 +334,13 @@ suite("commands/clients", () => {
       "updateModels",
       "unconfigure",
     ]);
+  });
+
+  test("only agents already set up for the gateway are pre-ticked", () => {
+    assert.strictEqual(pickedByDefault("configured"), true);
+    assert.strictEqual(pickedByDefault("up to date"), true);
+    assert.strictEqual(pickedByDefault("not configured"), false);
+    assert.strictEqual(pickedByDefault(undefined), false);
   });
 });
 

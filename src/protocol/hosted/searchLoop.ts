@@ -239,9 +239,15 @@ function addUsage(
   const cr = sum(a.cacheRead, b.cacheRead);
   const cw = sum(a.cacheWrite, b.cacheWrite);
   const rs = sum(a.reasoning, b.reasoning);
-  if (cr !== undefined) out.cacheRead = cr;
-  if (cw !== undefined) out.cacheWrite = cw;
-  if (rs !== undefined) out.reasoning = rs;
+  if (cr !== undefined) {
+    out.cacheRead = cr;
+  }
+  if (cw !== undefined) {
+    out.cacheWrite = cw;
+  }
+  if (rs !== undefined) {
+    out.reasoning = rs;
+  }
   return out;
 }
 

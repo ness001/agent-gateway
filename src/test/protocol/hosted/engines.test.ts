@@ -69,7 +69,9 @@ suite("protocol/hosted/urlSafety", () => {
     test(`7 ${url} -> ${safe ? "safe" : reason}`, () => {
       const r = checkUrl(url);
       assert.equal(r.safe, safe);
-      if (!r.safe) assert.equal(r.reason, reason);
+      if (!r.safe) {
+        assert.equal(r.reason, reason);
+      }
     });
   }
 });

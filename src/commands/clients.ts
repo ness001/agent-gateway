@@ -69,6 +69,15 @@ export function clientItemDescription(
     .join(" · ");
 }
 
+/**
+ * Pre-ticked in the agent picker: only agents the gateway is already set up
+ * in, so OK updates or removes them. Installed agents that were never set up
+ * start unticked; the user opts in.
+ */
+export function pickedByDefault(state: ClientConfigState | undefined): boolean {
+  return state === "configured" || state === "up to date";
+}
+
 export type ClientAction = "configure" | "updateModels" | "unconfigure";
 
 export const CLIENT_ACTION_LABELS: Record<ClientAction, string> = {
@@ -105,7 +114,7 @@ async function pickClients(
         label: a.label,
         description: clientItemDescription(installed, a.discovery, state),
         detail: a.caveat,
-        picked: installed,
+        picked: pickedByDefault(state),
         adapter: a,
       };
     }),
@@ -259,21 +268,23 @@ export async function runClientConfiguration(
   let backups: string[] = [];
   if (changed.length > 0) {
     const apply = `Apply changes to ${changed.length} file${changed.length === 1 ? "" : "s"} (backups are created)`;
-    for (;;) {
-      const choice = await vscode.window.showInformationMessage(
-        verb,
-        { modal: true, detail: preview },
+    let choice = await vscode.window.showInformationMessage(
+      verb,
+      { modal: true, detail: preview },
+      apply,
+      "Show diff",
+    );
+    if (choice === "Show diff") {
+      await showDiffs(plans, [input.apiKey]);
+      // Non-modal, so the diff editors stay scrollable while deciding.
+      choice = await vscode.window.showInformationMessage(
+        `${verb}: review the diffs, then apply or cancel.`,
         apply,
-        "Show diff",
+        "Cancel",
       );
-      if (choice === "Show diff") {
-        await showDiffs(plans, [input.apiKey]);
-        continue;
-      }
-      if (choice !== apply) {
-        return;
-      }
-      break;
+    }
+    if (choice !== apply) {
+      return;
     }
     try {
       for (const [, p] of plans) {

@@ -72,7 +72,9 @@ function scripted(rounds: unknown[][]) {
       const parts = rounds[Math.min(round++, rounds.length - 1)];
       return {
         stream: (async function* () {
-          for (const p of parts) yield p;
+          for (const p of parts) {
+            yield p;
+          }
         })(),
       };
     },

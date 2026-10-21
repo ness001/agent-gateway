@@ -56,7 +56,9 @@ function fakeModel(script: Script) {
     seen.push(req);
     const evs = script(req, seen.length - 1);
     return (async function* () {
-      for (const e of evs) yield e;
+      for (const e of evs) {
+        yield e;
+      }
     })();
   };
   return { seen, call };
@@ -107,7 +109,9 @@ const end = (reason: "stop" | "tool" = "stop"): CoreEvent => ({
 
 async function collect(it: AsyncIterable<CoreEvent>): Promise<CoreEvent[]> {
   const out: CoreEvent[] = [];
-  for await (const e of it) out.push(e);
+  for await (const e of it) {
+    out.push(e);
+  }
   return out;
 }
 
@@ -233,7 +237,9 @@ suite("protocol/hosted/searchLoop", () => {
 
   test("a failed search gives an error result and the loop continues", async () => {
     const eng = engine(async (q) => {
-      if (q === "bad") throw new EngineError("http", 429);
+      if (q === "bad") {
+        throw new EngineError("http", 429);
+      }
       return [{ url: "https://ok.example", title: "ok", snippet: "" }];
     });
     const { m, p } = run(
@@ -277,12 +283,13 @@ suite("protocol/hosted/searchLoop", () => {
     });
     const { m, eng, p } = run(
       (r, i) => {
-        if (i === 0)
+        if (i === 0) {
           return [
             { e: "text", delta: "Let me check." },
             search("s1", "year of x"),
             end("tool"),
           ];
+        }
         assert.ok(r.tools.some((t) => t.name === "save_year"));
         return [
           {

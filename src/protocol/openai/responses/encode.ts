@@ -367,13 +367,14 @@ export class ResponsesEncoder implements Encoder<ResponsesFrame> {
         output_index: index,
         item: structuredClone(item),
       });
-      if (this.opts.summary !== false)
+      if (this.opts.summary !== false) {
         this.emit(sink, "response.reasoning_summary_part.added", {
           item_id: item.id,
           output_index: index,
           summary_index: 0,
           part: { type: "summary_text", text: "" },
         });
+      }
     }
     const o = this.open as Extract<Open, { kind: "reasoning" }>;
     if (signature !== undefined && this.opts.includeEncryptedReasoning) {
