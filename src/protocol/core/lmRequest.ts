@@ -73,6 +73,8 @@ export interface LmToolLike {
 }
 
 export interface LmRequestOptions {
+  /** Provider configuration, separate from upstream modelOptions. */
+  configuration?: { contextSize: number };
   justification: string;
   modelOptions: Record<string, unknown>;
   tools?: LmToolLike[];
