@@ -61,6 +61,7 @@ suite("claudeCodeAdapter", () => {
       "gateway-claude-claude-sonnet-4.5",
     );
     assert.strictEqual(obj.env.CLAUDE_CODE_AUTO_MODE_SERVER, "0");
+    assert.strictEqual(obj.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS, "128000");
     assert.strictEqual(obj.env.DISABLE_TELEMETRY, "1");
     assert.deepStrictEqual(obj.permissions.allow, [
       "Bash(git status)",
@@ -75,6 +76,7 @@ suite("claudeCodeAdapter", () => {
       CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: null,
       ANTHROPIC_MODEL: "opus",
       CLAUDE_CODE_AUTO_MODE_SERVER: null,
+      CLAUDE_CODE_MAX_OUTPUT_TOKENS: null,
     });
   });
 
@@ -133,7 +135,11 @@ suite("claudeCodeAdapter", () => {
 
   test("missing file is created; unplan removes keys", () => {
     const text = after(claudeCodeAdapter.plan(input, { [FILE]: undefined }));
-    assert.strictEqual(parse(text).env.AGENT_GATEWAY_PREVIOUS, undefined);
+    assert.strictEqual(
+      JSON.parse(parse(text).env.AGENT_GATEWAY_PREVIOUS)
+        .CLAUDE_CODE_MAX_OUTPUT_TOKENS,
+      null,
+    );
     const back = after(claudeCodeAdapter.unplan(input, { [FILE]: text }));
     assert.deepStrictEqual(parse(back), { env: {} });
   });
@@ -171,6 +177,69 @@ suite("claudeCodeAdapter", () => {
     );
   });
 
+  for (const existing of [undefined, "64000", "128000"]) {
+    for (const legacy of [false, true]) {
+      test(`output default preserves and restores ${existing} (legacy=${legacy})`, () => {
+        const original = parse(realistic);
+        if (existing !== undefined) {
+          original.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = existing;
+        }
+        if (legacy) {
+          original.env.AGENT_GATEWAY_PREVIOUS = JSON.stringify({
+            ANTHROPIC_MODEL: "opus",
+          });
+        }
+        const before = JSON.stringify(original);
+        const plan = claudeCodeAdapter.plan(input, { [FILE]: before });
+        const text = after(plan);
+        assert.strictEqual(
+          parse(text).env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,
+          existing ?? "128000",
+        );
+        assert.ok(
+          plan.summary.some((s) =>
+            s.includes(`CLAUDE_CODE_MAX_OUTPUT_TOKENS=${existing ?? "128000"}`),
+          ),
+        );
+        assert.strictEqual(
+          claudeCodeAdapter.plan(input, { [FILE]: text }).changes.length,
+          0,
+        );
+        const restored = parse(
+          after(claudeCodeAdapter.unplan(input, { [FILE]: text })),
+        );
+        assert.strictEqual(
+          restored.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,
+          existing,
+        );
+      });
+    }
+  }
+
+  test("unconfigure legacy settings does not remove an unmanaged output limit", () => {
+    for (const previous of [
+      undefined,
+      JSON.stringify({ ANTHROPIC_MODEL: "opus" }),
+    ]) {
+      const before = JSON.stringify({
+        env: {
+          ANTHROPIC_MODEL: "gpt-6-astra",
+          CLAUDE_CODE_MAX_OUTPUT_TOKENS: "64000",
+          AGENT_GATEWAY_PREVIOUS: previous,
+        },
+      });
+      const restored = parse(
+        after(claudeCodeAdapter.unplan(input, { [FILE]: before })),
+      );
+      assert.strictEqual(restored.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS, "64000");
+    }
+  });
+  test("invalid saved backup is not overwritten", () => {
+    for (const saved of ["not json", "null", "[]", "42"]) {
+      const before = JSON.stringify({ env: { AGENT_GATEWAY_PREVIOUS: saved } });
+      assert.throws(() => claudeCodeAdapter.plan(input, { [FILE]: before }));
+    }
+  });
   test("invalid JSON throws", () => {
     assert.throws(() => claudeCodeAdapter.plan(input, { [FILE]: "{ nope" }));
   });
