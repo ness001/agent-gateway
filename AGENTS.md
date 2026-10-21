@@ -1,6 +1,8 @@
 # Agent instructions
 
 Read CONTRIBUTING.md before changing or building this extension.
+For release, publish, or version-tag requests, read
+[the repository release skill](.agents/skills/agent-gateway-release/SKILL.md).
 Preserve unrelated changes and active user sessions; use an isolated worktree
 when another task is editing the same checkout.
 
