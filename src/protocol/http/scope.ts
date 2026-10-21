@@ -57,7 +57,7 @@ export class RequestScope {
     this.firstChunk = this.timers.setTimeout(() => {
       this.firstChunk = undefined;
       opts.logger?.warn(
-        `[${this.requestId}] ${opts.protocol} no first chunk after ${Math.round(warnMs / 1000)} s. ${TIMEOUT_HINT}`,
+        `[${this.requestId}] ${opts.protocol} no first chunk after ${Math.round(warnMs / 1000)} s. Request is still pending (deadline: ${Math.round(deadlineMs / 1000)} s). Prompt processing, model reasoning, or service load can delay output. If VS Code shows a model-access prompt, approve it to continue.`,
       );
     }, warnMs);
     if (opts.signal?.aborted) {
