@@ -112,3 +112,29 @@ suite("gateway AI model mapping", () => {
     }
   });
 });
+
+suite("default agent mapping entries", () => {
+  test("accepts empty targets when no suitable model is available", () => {
+    const rows = sources.map((source) => ({
+      source,
+      target: "",
+      reason: "No suitable model available.",
+    }));
+    assert.deepStrictEqual(
+      parseMappings(JSON.stringify({ mappings: rows }), sources, []),
+      rows,
+    );
+    assert.ok(
+      mappingPrompt(sources, []).includes("do not force a replacement"),
+    );
+    for (const source of sources) {
+      assert.strictEqual(
+        resolveModelAlias(models, source, {
+          userAliases: { [source]: "" },
+          operation: "anthropic.messages",
+        }),
+        undefined,
+      );
+    }
+  });
+});
