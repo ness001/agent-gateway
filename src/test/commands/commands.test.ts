@@ -164,11 +164,20 @@ suite("commands/status", () => {
         "copyHealth",
         "openErrorLog",
         "showLog",
+        "logLevel",
         "setApiKey",
         "remotes",
         "webSearch",
         "clients",
       ],
+    );
+  });
+
+  test("shows current log level beside its action", () => {
+    assert.strictEqual(
+      statusItems(health(), "debug").find((i) => i.action === "logLevel")
+        ?.description,
+      "Current: debug",
     );
   });
 
