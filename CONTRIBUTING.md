@@ -99,6 +99,9 @@ macOS, with the same checks as `scripts/run-tests.ps1` (the VS Code tests run
 under `xvfb-run` on Linux). When all three pass, a production VSIX is uploaded
 as the `agent-gateway-vsix` artifact.
 
+For the complete release workflow, use the repository-local
+[Agent Gateway release skill](.agents/skills/agent-gateway-release/SKILL.md).
+
 To release:
 
 1. Update `version` in `package.json` and the [changelog](CHANGELOG.md).
