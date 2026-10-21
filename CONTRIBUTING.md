@@ -165,3 +165,10 @@ loading `dist/extension.cjs` and `activate()` until `/health` answers, in a
 fresh process with a stub `vscode` (skipped when `dist/` is not built). Each
 row's p95 must stay under the ceiling (5 to 10 times a local run) in `src/test/perf/budgets.json`;
 one combined table is printed at the end.
+
+## Investigation skill
+
+For Codex session replay, standalone tool events, or custom-provider protocol
+failures, use the repository's [Codex source diagnosis skill](.agents/skills/codex-source-diagnosis/SKILL.md).
+It traces local evidence to pinned upstream source and tests without committing
+private session data. The skill is not included in the extension VSIX.
