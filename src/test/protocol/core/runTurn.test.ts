@@ -300,3 +300,205 @@ suite("protocol/core countTokens", () => {
     );
   });
 });
+
+suite("protocol/core missing tool-call recovery", () => {
+  const missing = new Error(
+    "400: No tool call found for function call output with call_id call_history.",
+  );
+  function history(): CoreRequest {
+    return req({
+      turns: [
+        {
+          role: "assistant",
+          parts: [
+            {
+              type: "toolCall",
+              id: "call_history",
+              name: "read",
+              input: { path: "example.txt" },
+            },
+          ],
+        },
+        {
+          role: "user",
+          parts: [
+            {
+              type: "toolResult",
+              callId: "call_history",
+              content: [{ type: "text", text: "historical result" }],
+              isError: false,
+            },
+          ],
+        },
+        { role: "user", parts: [{ type: "text", text: "Continue" }] },
+      ],
+    });
+  }
+  async function invoke(
+    model: LmChatLike,
+    request = history(),
+    scope = new FakeScope(),
+  ) {
+    const sink = new CollectSink<string>();
+    const result = await runTurn({
+      api,
+      model,
+      req: request,
+      scope,
+      encoder,
+      sink,
+    });
+    return { result, sink };
+  }
+
+  for (const streamError of [false, true]) {
+    test(`retries rejected history once without dropping content (stream=${streamError})`, async () => {
+      const request = history();
+      const before = JSON.stringify(request);
+      let attempts = 0;
+      const model = fakeModel(() => parts([new TextPart("Recovered")]));
+      model.sendRequest = async (messages) => {
+        if (++attempts === 1) {
+          if (!streamError) {
+            throw missing;
+          }
+          return {
+            stream: (async function* () {
+              throw missing;
+              yield new TextPart("unreachable");
+            })(),
+          };
+        }
+        const serialized = JSON.stringify(messages);
+        assert.ok(serialized.includes("historical result"));
+        assert.ok(serialized.includes("example.txt"));
+        assert.ok(serialized.includes("call_history"));
+        assert.ok(serialized.includes("Continue"));
+        const contents = (messages as { content: unknown[] }[]).flatMap(
+          (m) => m.content,
+        );
+        assert.ok(
+          !contents.some(
+            (p) => p instanceof ToolCallPart || p instanceof ToolResultPart,
+          ),
+        );
+        return { stream: parts([new TextPart("Recovered"), usagePart]) };
+      };
+      const { result } = await invoke(model, request);
+      assert.strictEqual(result.outcome, "completed");
+      assert.strictEqual(attempts, 2);
+      assert.strictEqual(JSON.stringify(request), before);
+    });
+  }
+
+  test("does not retry after a streamed part", async () => {
+    let attempts = 0;
+    const model = fakeModel(() =>
+      (async function* () {
+        attempts++;
+        yield new TextPart("Partial");
+        throw missing;
+      })(),
+    );
+    assert.strictEqual((await invoke(model)).result.outcome, "error");
+    assert.strictEqual(attempts, 1);
+  });
+
+  test("second rejection is surfaced instead of looping", async () => {
+    let attempts = 0;
+    const model = fakeModel(() => parts([]));
+    model.sendRequest = async () => {
+      attempts++;
+      throw missing;
+    };
+    assert.strictEqual((await invoke(model)).result.outcome, "error");
+    assert.strictEqual(attempts, 2);
+  });
+
+  for (const message of [
+    "rate limit",
+    "No tool call found for function call output with call_id call_unknown.",
+  ]) {
+    test(`does not retry an unrelated or unresolvable error: ${message}`, async () => {
+      let attempts = 0;
+      const model = fakeModel(() => parts([]));
+      model.sendRequest = async () => {
+        attempts++;
+        throw new Error(message);
+      };
+      assert.strictEqual((await invoke(model)).result.outcome, "error");
+      assert.strictEqual(attempts, 1);
+    });
+  }
+
+  test("hosted follow-up round uses the same recovery path", async () => {
+    let attempts = 0;
+    const model = fakeModel(() => parts([]));
+    model.sendRequest = async () => {
+      attempts++;
+      if (attempts === 2) {
+        throw missing;
+      }
+      return { stream: parts([new TextPart("ok")]) };
+    };
+    const hook: HostedHook = {
+      async *wrap(events, context) {
+        for await (const event of events) {
+          if (event.e !== "end") {
+            yield event;
+          }
+        }
+        yield* context.callModel(history());
+      },
+    };
+    const result = await runTurn({
+      api,
+      model,
+      req: req(),
+      scope: new FakeScope(),
+      encoder,
+      sink: new CollectSink<string>(),
+      hosted: hook,
+    });
+    assert.strictEqual(result.outcome, "completed");
+    assert.strictEqual(attempts, 3);
+  });
+
+  test("does not retry after usage data or a timeout", async () => {
+    for (const timeout of [false, true]) {
+      const scope = new FakeScope();
+      let attempts = 0;
+      const model = fakeModel(() =>
+        (async function* () {
+          attempts++;
+          if (timeout) {
+            scope.cancel("timeout");
+          } else {
+            yield usagePart;
+          }
+          throw missing;
+        })(),
+      );
+      assert.strictEqual(
+        (await invoke(model, history(), scope)).result.outcome,
+        "error",
+      );
+      assert.strictEqual(attempts, 1);
+    }
+  });
+  test("does not retry after cancellation", async () => {
+    const scope = new FakeScope();
+    let attempts = 0;
+    const model = fakeModel(() => parts([]));
+    model.sendRequest = async () => {
+      attempts++;
+      scope.cancel("client_abort");
+      throw missing;
+    };
+    assert.strictEqual(
+      (await invoke(model, history(), scope)).result.outcome,
+      "cancelled",
+    );
+    assert.strictEqual(attempts, 1);
+  });
+});
