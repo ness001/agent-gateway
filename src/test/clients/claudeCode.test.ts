@@ -179,7 +179,7 @@ suite("claudeCodeAdapter", () => {
 
   for (const existing of [undefined, "64000", "128000"]) {
     for (const legacy of [false, true]) {
-      test(`output default preserves and restores ${existing} (legacy=${legacy})`, () => {
+      test(`output configuration overrides and restores ${existing} (legacy=${legacy})`, () => {
         const original = parse(realistic);
         if (existing !== undefined) {
           original.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = existing;
@@ -194,11 +194,11 @@ suite("claudeCodeAdapter", () => {
         const text = after(plan);
         assert.strictEqual(
           parse(text).env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,
-          existing ?? "128000",
+          "128000",
         );
         assert.ok(
           plan.summary.some((s) =>
-            s.includes(`CLAUDE_CODE_MAX_OUTPUT_TOKENS=${existing ?? "128000"}`),
+            s.includes("CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000"),
           ),
         );
         assert.strictEqual(
@@ -215,6 +215,27 @@ suite("claudeCodeAdapter", () => {
       });
     }
   }
+
+  test("reconfigure overwrites user edits without losing the original backup", () => {
+    const original = parse(realistic);
+    original.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = "64000";
+    const once = after(
+      claudeCodeAdapter.plan(input, { [FILE]: JSON.stringify(original) }),
+    );
+    const edited = parse(once);
+    edited.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = "16000";
+    const twice = after(
+      claudeCodeAdapter.plan(input, { [FILE]: JSON.stringify(edited) }),
+    );
+    assert.strictEqual(
+      parse(twice).env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,
+      "128000",
+    );
+    const restored = parse(
+      after(claudeCodeAdapter.unplan(input, { [FILE]: twice })),
+    );
+    assert.deepStrictEqual(restored, original);
+  });
 
   test("unconfigure legacy settings does not remove an unmanaged output limit", () => {
     for (const previous of [
