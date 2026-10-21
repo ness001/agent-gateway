@@ -655,27 +655,30 @@ suite("Gateway app", () => {
   ] as const) {
     test(`remote ${code} returns ${status} in each protocol envelope`, async () => {
       const h = harness();
+      // A valid correlation ID may contain "tok"; it is not the error secret.
+      const headers = { "x-request-id": "req_tok_remote_failure" };
+      const sensitiveDetail = "private-upstream-detail/api-key=fixture-secret";
       h.deps.fetchImpl = (async () => {
         throw new TypeError("fetch failed", {
-          cause: Object.assign(new Error("tok"), { code }),
+          cause: Object.assign(new Error(sensitiveDetail), { code }),
         });
       }) as typeof fetch;
       const app = createGatewayApp(h.deps);
       const msg = `Remote upstream 'box' is unavailable: ${category}.`;
       const o = await app.fetch(
-        post("/v1/responses", { model: "box--gpt-5-remote" }),
+        post("/v1/responses", { model: "box--gpt-5-remote" }, headers),
       );
       assert.strictEqual(o.status, status);
       assert.ok((await o.json()).error.message.startsWith(msg));
       const a = await app.fetch(
-        post("/v1/messages", { model: "box--gpt-5-remote" }),
+        post("/v1/messages", { model: "box--gpt-5-remote" }, headers),
       );
       assert.strictEqual(a.status, status);
       const aj = await a.json();
       assert.strictEqual(aj.type, "error");
       assert.ok(aj.error.message.startsWith(msg));
       const g = await app.fetch(
-        post("/v1beta/models/box--gpt-5-remote:countTokens", {}),
+        post("/v1beta/models/box--gpt-5-remote:countTokens", {}, headers),
       );
       assert.strictEqual(g.status, status);
       assert.strictEqual((await g.json()).error.code, status);
@@ -686,7 +689,8 @@ suite("Gateway app", () => {
             l.includes(category),
         ),
       );
-      assert.ok(!h.logs.some((l) => l.includes("tok")));
+      assert.ok(h.logs.some((l) => l.includes(headers["x-request-id"])));
+      assert.ok(!h.logs.some((l) => l.includes(sensitiveDetail)));
     });
   }
 
