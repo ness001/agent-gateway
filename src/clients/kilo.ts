@@ -7,6 +7,7 @@ import {
 } from "jsonc-parser";
 import * as path from "path";
 
+import { validContextWindow } from "./contextWindow";
 import {
   type ClientAdapter,
   type ClientConfigInput,
@@ -65,8 +66,14 @@ function kiloModels(models: GatewayModel[]): Record<string, unknown> {
       reasoning: m.reasoning,
       attachment: m.inputModalities.includes("image"),
     };
-    if (m.contextWindow !== null && m.maxOutputTokens !== undefined) {
-      entry.limit = { context: m.contextWindow, output: m.maxOutputTokens };
+    const context = validContextWindow(m.contextWindow);
+    if (context !== undefined || m.maxOutputTokens !== undefined) {
+      entry.limit = {
+        ...(context !== undefined ? { context } : {}),
+        ...(m.maxOutputTokens !== undefined
+          ? { output: m.maxOutputTokens }
+          : {}),
+      };
     }
     out[m.id] = entry;
   }

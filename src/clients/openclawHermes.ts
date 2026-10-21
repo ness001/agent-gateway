@@ -8,6 +8,7 @@ import {
 import * as path from "path";
 import { isMap, parseDocument } from "yaml";
 
+import { validContextWindow } from "./contextWindow";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -196,8 +197,9 @@ export const openclawAdapter: ClientAdapter = {
           ? ["text", "image"]
           : ["text"],
       };
-      if (m.contextWindow) {
-        entry.contextWindow = m.contextWindow;
+      const contextWindow = validContextWindow(m.contextWindow);
+      if (contextWindow !== undefined) {
+        entry.contextWindow = contextWindow;
       }
       if (m.maxOutputTokens) {
         entry.maxTokens = m.maxOutputTokens;
@@ -343,6 +345,14 @@ export const hermesAdapter: ClientAdapter = {
       transport: "chat_completions",
       default_model: input.defaultModel,
       discover_models: true,
+      models: Object.fromEntries(
+        agentModels(input.models).flatMap((m) => {
+          const context = validContextWindow(m.contextWindow);
+          return context === undefined
+            ? []
+            : [[m.id, { context_length: context }]];
+        }),
+      ),
     };
     const existing = doc.getIn(["providers", GATEWAY_PROVIDER_ID]);
     if (isMap(existing)) {
@@ -356,7 +366,7 @@ export const hermesAdapter: ClientAdapter = {
     return {
       changes: after === before ? [] : [{ path: p, before, after }],
       summary: [
-        `Upsert providers.${GATEWAY_PROVIDER_ID} (${entry.api}, chat_completions) in ${p}; the model block is left unchanged.`,
+        `Upsert providers.${GATEWAY_PROVIDER_ID} (${entry.api}, chat_completions) in ${p}; per-model context lengths come from gateway metadata. The global model block is left unchanged and may override these lengths.`,
         `Run 'hermes model' and pick ${GATEWAY_PROVIDER_ID} to make it the active provider.`,
       ],
       afterApply:

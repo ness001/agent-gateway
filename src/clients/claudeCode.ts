@@ -2,6 +2,7 @@ import { ParseError, applyEdits, modify, parse } from "jsonc-parser";
 import * as path from "path";
 
 import { ALIAS_PREFIX } from "../gateway/catalog";
+import { selectedContextWindow } from "./contextWindow";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -19,6 +20,7 @@ const MANAGED_KEYS = [
   "CLAUDE_CODE_AUTO_MODE_SERVER",
 ] as const;
 const PREVIOUS_KEY = "AGENT_GATEWAY_PREVIOUS";
+const CONTEXT_KEY = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
 const OUTPUT_KEY = "CLAUDE_CODE_MAX_OUTPUT_TOKENS";
 const DEFAULT_OUTPUT_TOKENS = "128000";
 
@@ -80,6 +82,50 @@ function desiredValues(input: ClientConfigInput): Record<string, string> {
       : ALIAS_PREFIX + input.defaultModel,
     CLAUDE_CODE_AUTO_MODE_SERVER: "0",
   };
+}
+
+/** Track context ownership independently, including upgrades from older backups. */
+function configureContext(
+  text: string,
+  input: ClientConfigInput,
+  summary: string[],
+): string {
+  const env = readEnv(text);
+  const capacity = selectedContextWindow(input);
+  const saved: unknown =
+    typeof env[PREVIOUS_KEY] === "string" ? JSON.parse(env[PREVIOUS_KEY]) : {};
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) {
+    throw new Error(
+      "Claude Code gateway backup is invalid; restore it before configuring.",
+    );
+  }
+  const previous = saved as Record<string, unknown>;
+  if (capacity !== undefined) {
+    if (!Object.hasOwn(previous, CONTEXT_KEY)) {
+      previous[CONTEXT_KEY] = env[CONTEXT_KEY] ?? null;
+      text = setValue(text, ["env", PREVIOUS_KEY], JSON.stringify(previous));
+    }
+    text = setValue(text, ["env", CONTEXT_KEY], String(capacity));
+    summary.push(
+      "Set " +
+        CONTEXT_KEY +
+        "=" +
+        capacity +
+        " from the selected model's advertised context window.",
+    );
+  } else {
+    if (Object.hasOwn(previous, CONTEXT_KEY)) {
+      text = setValue(
+        text,
+        ["env", CONTEXT_KEY],
+        previous[CONTEXT_KEY] ?? undefined,
+      );
+    }
+    summary.push(
+      "Context window unavailable; no capacity is guessed and any gateway context override is restored.",
+    );
+  }
+  return text;
 }
 
 export const claudeCodeAdapter: ClientAdapter = {
@@ -150,6 +196,7 @@ export const claudeCodeAdapter: ClientAdapter = {
     summary.push(
       `${OUTPUT_KEY}=${env[OUTPUT_KEY] ?? DEFAULT_OUTPUT_TOKENS} (${OUTPUT_KEY in env ? "preserved existing value" : "gateway default"}).`,
     );
+    text = configureContext(text, input, summary);
     summary.push(`If /model does not list gateway models, delete ${cache}.`);
     return {
       changes: text === before ? [] : [{ path: file, before, after: text }],
@@ -192,6 +239,13 @@ export const claudeCodeAdapter: ClientAdapter = {
         text,
         ["env", OUTPUT_KEY],
         previous[OUTPUT_KEY] ?? undefined,
+      );
+    }
+    if (previous && Object.hasOwn(previous, CONTEXT_KEY)) {
+      text = setValue(
+        text,
+        ["env", CONTEXT_KEY],
+        previous[CONTEXT_KEY] ?? undefined,
       );
     }
     if (PREVIOUS_KEY in env) {
