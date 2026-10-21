@@ -92,6 +92,12 @@ show every model. **Configure Coding Agents** writes the selected model's
 `gateway-claude-` alias to Claude Code's `ANTHROPIC_MODEL` setting; other
 clients keep the selected model ID. Existing aliases are not prefixed again.
 
+For Claude Code, configuration also defaults `CLAUDE_CODE_MAX_OUTPUT_TOKENS`
+to `128000` when unset. An existing value is preserved. This is a requested
+output budget, not a guarantee that every upstream model supports it; use a
+lower value for models with smaller limits. Removing the gateway restores the
+previous value or removes the default added by configuration.
+
 ### Unknown models and aliases
 
 A request for an unknown model falls back to the fallback model (logged as a
