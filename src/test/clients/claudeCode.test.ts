@@ -56,7 +56,10 @@ suite("claudeCodeAdapter", () => {
     assert.strictEqual(obj.env.ANTHROPIC_BASE_URL, "http://127.0.0.1:24444");
     assert.strictEqual(obj.env.ANTHROPIC_AUTH_TOKEN, PLACEHOLDER_API_KEY);
     assert.strictEqual(obj.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY, "1");
-    assert.strictEqual(obj.env.ANTHROPIC_MODEL, "claude-sonnet-4.5");
+    assert.strictEqual(
+      obj.env.ANTHROPIC_MODEL,
+      "gateway-claude-claude-sonnet-4.5",
+    );
     assert.strictEqual(obj.env.CLAUDE_CODE_AUTO_MODE_SERVER, "0");
     assert.strictEqual(obj.env.DISABLE_TELEMETRY, "1");
     assert.deepStrictEqual(obj.permissions.allow, [
@@ -75,6 +78,32 @@ suite("claudeCodeAdapter", () => {
     });
   });
 
+  for (const [selected, expected] of [
+    ["gpt-6-astra", "gateway-claude-gpt-6-astra"],
+    ["gateway-claude-gpt-6-astra", "gateway-claude-gpt-6-astra"],
+    ["remote--gpt-6-astra", "gateway-claude-remote--gpt-6-astra"],
+    ["gpt-6-astra[1m]", "gateway-claude-gpt-6-astra[1m]"],
+    ["gateway-claude-gpt-6-astra[1m]", "gateway-claude-gpt-6-astra[1m]"],
+  ]) {
+    test(`uses Claude-compatible alias for ${selected}`, () => {
+      const selectedInput = { ...input, defaultModel: selected };
+      const plan = claudeCodeAdapter.plan(selectedInput, { [FILE]: realistic });
+      const text = after(plan);
+      assert.strictEqual(parse(text).env.ANTHROPIC_MODEL, expected);
+      assert.ok(
+        plan.summary.some((s) => s.includes(`ANTHROPIC_MODEL=${expected}`)),
+      );
+      assert.strictEqual(selectedInput.defaultModel, selected);
+      assert.strictEqual(
+        claudeCodeAdapter.plan(selectedInput, { [FILE]: text }).changes.length,
+        0,
+      );
+      assert.deepStrictEqual(
+        parse(after(claudeCodeAdapter.unplan(selectedInput, { [FILE]: text }))),
+        parse(realistic),
+      );
+    });
+  }
   test("uses apiKey when given", () => {
     const obj = parse(
       after(
