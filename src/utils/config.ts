@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG: GatewayConfiguration = {
   port: 24444,
   logLevel: "info",
   remoteUpstreams: [],
-  modelAliases: {},
+  modelAliases: { "claude-haiku-5.5": "", "claude-sonnet-5": "" },
   fallbackModel: "",
   webSearch: {
     provider: "none",

@@ -122,7 +122,7 @@ export async function initializeModelMappings(
     const existing = JSON.parse(snapshot) as Record<string, string>;
     const picked = await vscode.window.showQuickPick(
       suggestions.map((mapping) => ({
-        label: `${mapping.source} → ${mapping.target}`,
+        label: `${mapping.source} → ${mapping.target || "(empty — no mapping)"}`,
         description: Object.hasOwn(existing, mapping.source)
           ? `Existing: ${existing[mapping.source] || "disabled"}; replace only if selected`
           : "New mapping",

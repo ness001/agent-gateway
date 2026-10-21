@@ -164,6 +164,11 @@ Search queries, results and page text are never logged.
 
 ### AI-assisted model mappings
 
+The mapping settings include `claude-haiku-5.5` and `claude-sonnet-5` by default,
+with empty targets. No replacement is forced when a suitable model is unavailable.
+An empty target means no explicit mapping; normal direct-model/fallback routing
+still applies. AI suggestions can also leave a target empty.
+
 Run **Set Fallback Model** > **Initialize model mappings with AI…** to suggest
 which available local models should answer an agent's default model names.
 Enter exact requested IDs, such as `claude-haiku-5.5` and `claude-sonnet-5`,
