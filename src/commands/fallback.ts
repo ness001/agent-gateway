@@ -3,9 +3,11 @@ import * as vscode from "vscode";
 import type { Gateway } from "../gateway/gateway";
 import type { CatalogEntry } from "../gateway/types";
 import { CONFIG_SECTION } from "../utils/config";
+import { initializeModelMappings } from "./modelMapping";
 
 export interface FallbackModelItem {
   label: string;
+  action?: "initializeMappings";
   /** Model ID to save; "" clears the setting. */
   id: string;
   description?: string;
@@ -13,7 +15,7 @@ export interface FallbackModelItem {
 }
 
 /**
- * Items of the Set Fallback Model picker: "Use default", then the user's own
+ * Items of the Set Fallback Model picker: "Use default", AI initialization, then the user's own
  * local, non-alias models sorted by ID. The current fallback is marked with
  * its source.
  */
@@ -29,6 +31,12 @@ export function fallbackModelItems(
       label: "Use default (gpt-6-astra if available)",
       id: "",
       description: current.source === "setting" ? undefined : "current",
+    },
+    {
+      label: "$(sparkle) Initialize model mappings with AI…",
+      id: "",
+      action: "initializeMappings",
+      description: "Review suggestions for agent default models",
     },
     ...models
       .filter((m) => m.remote === undefined && !m.isAlias)
@@ -64,6 +72,10 @@ export async function setFallbackModel(
     },
   );
   if (!picked) {
+    return;
+  }
+  if (picked.action === "initializeMappings") {
+    await initializeModelMappings(gw);
     return;
   }
   await vscode.workspace
