@@ -225,3 +225,25 @@ test("normal fallback choice still writes only fallbackModel", async () => {
     vscode.window.showQuickPick = pick;
   }
 });
+
+test("default mapping IDs are present and empty in both settings definitions", () => {
+  const pkg = require("../package.json");
+  const declared =
+    pkg.contributes.configuration.properties["agentGateway.modelAliases"]
+      .default;
+  const { DEFAULT_CONFIG } = require("../out/utils/config");
+  for (const source of ["claude-haiku-5.5", "claude-sonnet-5"]) {
+    assert.equal(declared[source], "");
+    assert.equal(DEFAULT_CONFIG.modelAliases[source], "");
+  }
+});
+test("review displays and saves an empty suggestion without inventing a target", async () => {
+  reset();
+  answer = JSON.stringify({
+    mappings: proposals.map((p) => ({ ...p, target: "" })),
+  });
+  await initializeModelMappings(gw);
+  assert.ok(picks[1][1].label.includes("(empty — no mapping)"));
+  assert.equal(writes[0][1]["claude-sonnet-5"], "");
+  assert.equal(writes[0][1]["claude-haiku-5.5"], "");
+});
