@@ -1094,3 +1094,83 @@ suite("protocol/openai/responses handler", () => {
     assert.strictEqual(res.status, 404);
   });
 });
+
+suite("protocol/openai/responses legacy tool results", () => {
+  for (const type of ["function_call_output", "custom_tool_call_output"]) {
+    for (const call_id of [undefined, null, ""]) {
+      test(`${type} without a usable call ID preserves historical output`, () => {
+        const item = {
+          type,
+          id: "fco_history",
+          name: "read",
+          namespace: "tools",
+          call_id,
+          output: "saved result",
+        };
+        const before = JSON.stringify(item);
+        const { core } = decodeResponses({ model: "m", input: [item] });
+        assert.strictEqual(core.turns[0].role, "user");
+        assert.ok(core.turns[0].parts.every((p) => p.type === "text"));
+        assert.ok(JSON.stringify(core.turns).includes("saved result"));
+        assert.ok(JSON.stringify(core.turns).includes("tools.read"));
+        assert.strictEqual(JSON.stringify(item), before);
+      });
+    }
+  }
+  test("preserves structured image output without inventing a call", () => {
+    const { core } = decodeResponses({
+      model: "m",
+      input: [
+        {
+          type: "function_call_output",
+          output: [
+            { type: "input_text", text: "image result" },
+            {
+              type: "input_image",
+              image_url: `data:image/png;base64,${PNG.toString("base64")}`,
+            },
+          ],
+        },
+      ],
+    });
+    assert.ok(core.turns[0].parts.some((p) => p.type === "image"));
+    assert.ok(
+      !core.turns[0].parts.some(
+        (p) => p.type === "toolResult" || p.type === "toolCall",
+      ),
+    );
+  });
+  test("present non-string IDs remain invalid", () => {
+    for (const call_id of [42, {}, false]) {
+      assert.strictEqual(
+        err(() =>
+          decodeResponses({
+            model: "m",
+            input: [
+              { type: "function_call_output", call_id, output: "result" },
+            ],
+          }),
+        ).param,
+        "input[0].call_id",
+      );
+    }
+  });
+  test("valid result IDs and missing invocation IDs retain existing behavior", () => {
+    const { core } = decodeResponses({
+      model: "m",
+      input: [
+        { type: "function_call_output", call_id: "call_1", output: "ok" },
+      ],
+    });
+    assert.strictEqual(core.turns[0].parts[0].type, "toolResult");
+    assert.strictEqual(
+      err(() =>
+        decodeResponses({
+          model: "m",
+          input: [{ type: "function_call", name: "read", arguments: "{}" }],
+        }),
+      ).param,
+      "input[0].call_id",
+    );
+  });
+});
