@@ -3,6 +3,7 @@ import { type BuildOptions, type LmApi, buildLmRequest } from "./lmRequest";
 import { lmStreamToEvents } from "./lmStream";
 import { logRepairs, repairPairing } from "./pairing";
 import { logRequestSettings, settingsFromRequest } from "./settingsLog";
+import { recoverRejectedToolHistory } from "./toolRecovery";
 import type {
   CoreEvent,
   CoreLogger,
@@ -111,7 +112,7 @@ export async function runTurn<F>(o: RunTurnOptions<F>): Promise<TurnResult> {
     },
     settingsFromRequest(o.req),
   );
-  const lm = buildLmRequest(o.api, { ...prepared, turns }, o.build);
+
   const abort = new AbortController();
   if (scope.reason) {
     abort.abort();
@@ -123,17 +124,12 @@ export async function runTurn<F>(o: RunTurnOptions<F>): Promise<TurnResult> {
   let usage: NormalizedUsage | undefined;
   let first = true;
   try {
-    const response = await o.model.sendRequest(
-      lm.messages,
-      lm.options,
-      scope.token,
-    );
-    const events = hook.wrap(
-      lmStreamToEvents(response.stream, {
-        maxOutputTokens: o.req.maxOutputTokens,
-      }),
-      { req: o.req, scope, callModel, signal: abort.signal },
-    );
+    const events = hook.wrap(requestEvents(o, { ...prepared, turns }, scope), {
+      req: o.req,
+      scope,
+      callModel,
+      signal: abort.signal,
+    });
     for await (const ev of events) {
       if (scope.reason || sink.cancelled) {
         abort.abort();
@@ -175,13 +171,54 @@ async function* roundEvents<F>(
   scope: TurnScope,
 ): AsyncIterable<CoreEvent> {
   const { turns } = repairPairing(req.turns);
-  const lm = buildLmRequest(o.api, { ...req, turns }, o.build);
-  const response = await o.model.sendRequest(
-    lm.messages,
-    lm.options,
-    scope.token,
-  );
-  yield* lmStreamToEvents(response.stream, {
-    maxOutputTokens: req.maxOutputTokens,
-  });
+  yield* requestEvents(o, { ...req, turns }, scope);
+}
+
+/** Retry only a pre-output missing-call rejection, once per model round. */
+async function* requestEvents<F>(
+  o: RunTurnOptions<F>,
+  req: CoreRequest,
+  scope: TurnScope,
+): AsyncIterable<CoreEvent> {
+  let current = req;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let started = false;
+    try {
+      const lm = buildLmRequest(o.api, current, o.build);
+      const response = await o.model.sendRequest(
+        lm.messages,
+        lm.options,
+        scope.token,
+      );
+      async function* tracked(): AsyncIterable<unknown> {
+        for await (const part of response.stream) {
+          // Even an ignored/usage part means the provider has started work.
+          started = true;
+          yield part;
+        }
+      }
+      yield* lmStreamToEvents(tracked(), {
+        maxOutputTokens: current.maxOutputTokens,
+      });
+      return;
+    } catch (error) {
+      if (
+        attempt !== 0 ||
+        started ||
+        scope.reason ||
+        scope.token.isCancellationRequested ||
+        o.sink.cancelled
+      ) {
+        throw error;
+      }
+      const turns = recoverRejectedToolHistory(current.turns, error);
+      if (!turns) {
+        throw error;
+      }
+      o.logger?.warn(
+        "Retrying rejected tool history once as historical text; tool contents preserved.",
+      );
+      current = { ...current, turns };
+    }
+  }
 }
