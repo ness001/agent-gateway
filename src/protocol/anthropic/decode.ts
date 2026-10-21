@@ -289,7 +289,14 @@ function decodeMessages(
         }
       });
     }
-    turns.push({ role, parts });
+    // Anthropic combines consecutive messages with the same role. Claude Code
+    // can replay parallel tool calls/results as separate message fragments.
+    const previous = turns.at(-1);
+    if (previous?.role === role) {
+      previous.parts.push(...parts);
+    } else {
+      turns.push({ role, parts });
+    }
   });
   return { turns, system };
 }
