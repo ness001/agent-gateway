@@ -1,8 +1,9 @@
 // Codex CLI / Codex desktop adapter. Edits ~/.codex/config.toml surgically:
-// only the top-level model_provider/model keys and the
+// only the top-level model_provider/model/context keys and the
 // [model_providers.agent-gateway] table are touched.
 import * as path from "path";
 
+import { selectedContextWindow } from "./contextWindow";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -14,6 +15,8 @@ import {
 
 const MARKER_PREFIX = "# agent-gateway previous:";
 const UNSET = "<unset>";
+const CONTEXT_KEY = "model_context_window";
+const CONTEXT_MARKER = "# agent-gateway previous context:";
 const TOP_KEYS = ["model_provider", "model"] as const;
 
 function codexConfigPath(home: string, platform: NodeJS.Platform): string {
@@ -154,7 +157,18 @@ function readMarker(p: Parsed): Record<string, string> | undefined {
         line.slice(MARKER_PREFIX.length).trim(),
       );
       if (m) {
-        return { model_provider: m[1], model: m[2] };
+        const result: Record<string, string> = {
+          model_provider: m[1],
+          model: m[2],
+        };
+        const context = p.lines
+          .slice(p.table.start + 1, p.table.end)
+          .map((line) => line.trim())
+          .find((line) => line.startsWith(CONTEXT_MARKER));
+        if (context) {
+          result[CONTEXT_KEY] = context.slice(CONTEXT_MARKER.length).trim();
+        }
+        return result;
       }
     }
   }
@@ -184,6 +198,9 @@ function buildTable(
   return [
     `[model_providers.${GATEWAY_PROVIDER_ID}]`,
     `${MARKER_PREFIX} model_provider=${marker.model_provider}, model=${marker.model}`,
+    ...(CONTEXT_KEY in marker
+      ? [`${CONTEXT_MARKER} ${marker[CONTEXT_KEY]}`]
+      : []),
     `name = ${tomlString(GATEWAY_PROVIDER_NAME)}`,
     `base_url = ${tomlString(`${input.gatewayUrl.replace(/\/+$/, "")}/v1`)}`,
     `wire_api = "responses"`,
@@ -232,6 +249,11 @@ function planCodex(
     model: findTopKey(p, "model")?.raw ?? UNSET,
   };
 
+  const capacity = selectedContextWindow(input);
+  if (capacity !== undefined && !(CONTEXT_KEY in marker)) {
+    marker[CONTEXT_KEY] = findTopKey(p, CONTEXT_KEY)?.raw ?? UNSET;
+  }
+
   // 1. Upsert the provider table.
   const tableLines = buildTable(input, marker);
   let lines = p.lines.slice();
@@ -260,14 +282,27 @@ function planCodex(
     model_provider: tomlString(GATEWAY_PROVIDER_ID),
     model: tomlString(input.defaultModel),
   };
+  if (capacity !== undefined) {
+    values[CONTEXT_KEY] = String(capacity);
+  } else if (CONTEXT_KEY in marker) {
+    values[CONTEXT_KEY] = marker[CONTEXT_KEY];
+  }
   const inserts: string[] = [];
-  for (const key of TOP_KEYS) {
+  const removals: number[] = [];
+  for (const key of Object.keys(values)) {
     const found = findTopKey(p, key);
-    if (found) {
+    if (values[key] === UNSET) {
+      if (found) {
+        removals.push(found.index);
+      }
+    } else if (found) {
       lines[found.index] = `${key} = ${values[key]}`;
     } else {
       inserts.push(`${key} = ${values[key]}`);
     }
+  }
+  for (const i of removals.sort((a, b) => b - a)) {
+    lines.splice(i, 1);
   }
   if (inserts.length) {
     // An empty top region directly followed by a header needs a separator.
@@ -280,7 +315,15 @@ function planCodex(
   summary.push(
     `Authenticate with experimental_bearer_token (${input.apiKey ? "gateway API key" : "placeholder; gateway has no key"})`,
   );
-  if (findTopKey(p, "model_context_window")) {
+  if (capacity !== undefined) {
+    summary.push(
+      `Set model_context_window = ${capacity} from the selected model metadata; reconfigure after changing models.`,
+    );
+  } else if (CONTEXT_KEY in marker) {
+    summary.push(
+      "Context metadata unavailable; restored the pre-gateway context setting instead of retaining stale capacity.",
+    );
+  } else if (findTopKey(p, CONTEXT_KEY)) {
     summary.push(
       "Note: top-level model_context_window is set and left unchanged; it may not match the gateway model",
     );
@@ -323,7 +366,12 @@ function unplanCodex(
   const current = findTopKey(p, "model_provider");
   if (current && unquote(current.raw) === GATEWAY_PROVIDER_ID) {
     const removals: number[] = [];
-    for (const key of TOP_KEYS) {
+    const inserts: string[] = [];
+    const keys = [
+      ...TOP_KEYS,
+      ...(marker && CONTEXT_KEY in marker ? [CONTEXT_KEY] : []),
+    ];
+    for (const key of keys) {
       const found = findTopKey(p, key);
       if (marker) {
         const prev = marker[key];
@@ -334,7 +382,7 @@ function unplanCodex(
         } else if (found) {
           lines[found.index] = `${key} = ${prev}`;
         } else {
-          lines.splice(0, 0, `${key} = ${prev}`);
+          inserts.push(`${key} = ${prev}`);
         }
       } else if (key === "model_provider" && found) {
         removals.push(found.index);
@@ -343,6 +391,7 @@ function unplanCodex(
     for (const i of removals.sort((a, b) => b - a)) {
       lines.splice(i, 1);
     }
+    lines.unshift(...inserts);
     if (marker) {
       summary.push(
         `Restore model_provider=${marker.model_provider}, model=${marker.model}`.replace(

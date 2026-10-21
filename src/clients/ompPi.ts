@@ -8,6 +8,7 @@ import {
 import * as path from "path";
 import { isMap, parseDocument } from "yaml";
 
+import { validContextWindow } from "./contextWindow";
 import {
   type ClientAdapter,
   type ClientConfigInput,
@@ -175,8 +176,9 @@ function piModels(models: GatewayModel[]): Record<string, unknown>[] {
         reasoning: m.reasoning,
         input: m.inputModalities.filter((x) => x === "text" || x === "image"),
       };
-      if (m.contextWindow !== null) {
-        entry.contextWindow = m.contextWindow;
+      const contextWindow = validContextWindow(m.contextWindow);
+      if (contextWindow !== undefined) {
+        entry.contextWindow = contextWindow;
       }
       if (m.maxOutputTokens !== undefined) {
         entry.maxTokens = m.maxOutputTokens;
