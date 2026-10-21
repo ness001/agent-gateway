@@ -185,6 +185,17 @@ async function* requestEvents<F>(
     let started = false;
     try {
       const lm = buildLmRequest(o.api, current, o.build);
+      // VS Code merges this over the provider's saved/default configuration.
+      // Without it Copilot can trim to its smaller default despite advertising
+      // a larger maxInputTokens, splitting historical tool call/result pairs.
+      // Use the resolved model's input budget, never the requested output limit.
+      if (
+        o.model.vendor === "copilot" &&
+        Number.isSafeInteger(o.model.maxInputTokens) &&
+        o.model.maxInputTokens > 0
+      ) {
+        lm.options.configuration = { contextSize: o.model.maxInputTokens };
+      }
       const response = await o.model.sendRequest(
         lm.messages,
         lm.options,
