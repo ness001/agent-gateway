@@ -434,6 +434,32 @@ function decodeInput(
       }
       case "custom_tool_call_output":
       case "function_call_output": {
+        // Resumed sessions can contain externally supplied tool results with
+        // no invocation ID. Preserve the data, but do not invent a pairing
+        // from the item ID (fco_...), tool name, or neighboring invocation.
+        if (
+          raw.call_id === undefined ||
+          raw.call_id === null ||
+          raw.call_id === ""
+        ) {
+          const name = [raw.namespace, raw.name]
+            .filter(
+              (value): value is string =>
+                typeof value === "string" && value.length > 0,
+            )
+            .join(".");
+          b.push("user", [
+            {
+              type: "text",
+              text: `[Historical tool result${name ? `: ${name}` : ""}; call ID unavailable]`,
+            },
+            ...toolOutput(raw.output, `${p}.output`, logger),
+          ]);
+          logger?.warn(
+            `openai-responses preserved ${p} tool result without call_id as historical content`,
+          );
+          break;
+        }
         const callId = str(raw.call_id, `${p}.call_id`);
         b.push("user", [
           {
