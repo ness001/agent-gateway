@@ -185,6 +185,7 @@ suite("hermesAdapter", () => {
       transport: "chat_completions",
       default_model: "claude-sonnet-4.5",
       discover_models: true,
+      models: { "claude-sonnet-4.5": { context_length: 200000 } },
     });
     assert.strictEqual(
       hermesAdapter.plan(input, { [HM]: after }).changes.length,
