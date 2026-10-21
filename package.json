@@ -132,7 +132,10 @@
         },
         "agentGateway.modelAliases": {
           "type": "object",
-          "default": {},
+          "default": {
+            "claude-haiku-5.5": "",
+            "claude-sonnet-5": ""
+          },
           "additionalProperties": {
             "type": "string"
           },
