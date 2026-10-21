@@ -164,6 +164,11 @@ Search queries, results and page text are never logged.
 
 ### AI-assisted model mappings
 
+Reopen **Set Fallback Model** to see **Mapping: &lt;requested ID&gt;** entries
+with their current targets, including empty defaults and saved custom mappings.
+Select a mapping to change its target or leave it empty, without running AI again.
+This changes only that mapping, not the fallback model or unrelated mappings.
+
 The mapping settings include `claude-haiku-5.5` and `claude-sonnet-5` by default,
 with empty targets. No replacement is forced when a suitable model is unavailable.
 An empty target means no explicit mapping; normal direct-model/fallback routing

@@ -176,3 +176,75 @@ export async function initializeModelMappings(
     );
   }
 }
+
+/** Tune one saved mapping without asking AI or changing other aliases. */
+export async function editModelMapping(
+  gw: Pick<Gateway, "nativeModels">,
+  source: string,
+): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    const before = config.get<Record<string, string>>("modelAliases", {});
+    const current = before[source] ?? "";
+    const snapshot = JSON.stringify(before);
+    // Aliases are shared across protocols; local native targets remain editable
+    // even when they are not eligible for AI's Anthropic-specific recommendations.
+    const candidates = gw
+      .nativeModels()
+      .filter((m) => m.remote === undefined && !m.isAlias);
+    const selected = await vscode.window.showQuickPick(
+      [
+        {
+          label: "Leave empty (no explicit mapping)",
+          id: "",
+          description: current === "" ? "Current" : undefined,
+        },
+        ...candidates
+          .sort((a, b) => a.id.localeCompare(b.id))
+          .map((m) => ({
+            label: m.id,
+            id: m.id,
+            description: m.id === current ? "Current" : m.displayName,
+          })),
+      ],
+      {
+        title: `Mapping for ${source}`,
+        placeHolder: `Current: ${current || "empty"}. Empty keeps normal direct-model/fallback routing.`,
+        ignoreFocusOut: true,
+      },
+    );
+    if (!selected || selected.id === current) {
+      return;
+    }
+    const latest = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    const aliases = latest.get<Record<string, string>>("modelAliases", {});
+    if (JSON.stringify(aliases) !== snapshot) {
+      throw new Error("Mappings changed during selection.");
+    }
+    if (
+      selected.id &&
+      !gw
+        .nativeModels()
+        .some(
+          (m) => m.id === selected.id && m.remote === undefined && !m.isAlias,
+        )
+    ) {
+      throw new Error("Selected model is no longer available.");
+    }
+    const inspected = latest.inspect("modelAliases");
+    await latest.update(
+      "modelAliases",
+      { ...aliases, [source]: selected.id },
+      inspected?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global,
+    );
+    void vscode.window.showInformationMessage(
+      `Mapping saved: ${source} → ${selected.id || "empty"}. Fallback model unchanged.`,
+    );
+  } catch {
+    void vscode.window.showErrorMessage(
+      "Could not save the mapping. Settings or model availability may have changed; reopen Set Fallback Model and retry.",
+    );
+  }
+}
