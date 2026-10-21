@@ -6,6 +6,7 @@ import {
   reasoningEffortFor,
 } from "../../../protocol/anthropic/decode";
 import { GatewayError } from "../../../protocol/core/errors";
+import { repairPairing } from "../../../protocol/core/pairing";
 
 const PNG = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
@@ -584,5 +585,34 @@ suite("protocol/anthropic decode", () => {
     assert.strictEqual(r.reasoningEffort, undefined);
     assert.strictEqual(r.echo.thinking, "adaptive");
     assert.strictEqual(r.system.length, 2);
+  });
+});
+
+suite("anthropic parallel tool history", () => {
+  test("fragmented parallel calls and completion-order results form one pair of turns", () => {
+    const messages = [
+      ...["a", "b", "c", "d", "e"].map((id) => ({
+        role: "assistant",
+        content: [{ type: "tool_use", id, name: "Read", input: {} }],
+      })),
+      ...["d", "e", "a", "b", "c"].map((id) => ({
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: id, content: `result-${id}` },
+        ],
+      })),
+    ];
+    const original = JSON.stringify(messages);
+    const decoded = decodeMessagesRequest(base({ messages }));
+    assert.strictEqual(decoded.turns.length, 2);
+    const repaired = repairPairing(decoded.turns);
+    assert.deepStrictEqual(repaired.repairs, []);
+    assert.deepStrictEqual(
+      repaired.turns[1].parts.map((p) =>
+        p.type === "toolResult" ? p.callId : "",
+      ),
+      ["a", "b", "c", "d", "e"],
+    );
+    assert.strictEqual(JSON.stringify(messages), original);
   });
 });

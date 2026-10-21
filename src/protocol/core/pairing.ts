@@ -136,14 +136,6 @@ export function repairPairing(input: readonly Turn[]): PairingOutcome {
     }
 
     const expectedIndex = i + 1;
-    const nextResultsInPlace =
-      expectedIndex < input.length
-        ? input[expectedIndex].parts.filter(
-            (p): p is ToolResultPart =>
-              p.type === "toolResult" && kept.get(p.callId)?.part === p,
-          )
-        : [];
-    let position = 0;
     const results: ToolResultPart[] = ownCalls.map((call) => {
       const found = kept.get(call.id);
       if (!found) {
@@ -155,13 +147,9 @@ export function repairPairing(input: readonly Turn[]): PairingOutcome {
         });
         return syntheticResult(call);
       }
-      const inPlace =
-        found.turnIndex === expectedIndex &&
-        nextResultsInPlace[position] === found.part;
-      if (found.turnIndex === expectedIndex) {
-        position++;
-      }
-      if (!inPlace) {
+      // Parallel results may arrive in completion order. Canonicalize them
+      // without reporting a repair unless a result moved across turns.
+      if (found.turnIndex !== expectedIndex) {
         repairs.push({
           kind: "reordered",
           toolName: call.name,
