@@ -116,7 +116,7 @@ suite("core/pairing", () => {
     assert.strictEqual(out.turns[1].parts[1].type, "text");
   });
 
-  test("out-of-order results are reordered", () => {
+  test("parallel completion order is normalized without warnings", () => {
     const out = repairPairing([
       asst(call("a"), call("b")),
       user(result("b"), result("a")),
@@ -124,7 +124,7 @@ suite("core/pairing", () => {
     assert.deepStrictEqual(out.turns[1].parts, [result("a"), result("b")]);
     assert.deepStrictEqual(
       out.repairs.map((r) => r.kind),
-      ["reordered", "reordered"],
+      [],
     );
   });
 
@@ -218,7 +218,7 @@ suite("core/pairing", () => {
     );
     assert.deepStrictEqual(
       repairPairing(turns).repairs.map((r) => r.kind),
-      ["reordered", "reordered"],
+      [],
     );
   });
 
