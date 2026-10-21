@@ -276,12 +276,19 @@ export async function runClientConfiguration(
     );
     if (choice === "Show diff") {
       await showDiffs(plans, [input.apiKey]);
-      // Non-modal, so the diff editors stay scrollable while deciding.
-      choice = await vscode.window.showInformationMessage(
-        `${verb}: review the diffs, then apply or cancel.`,
-        apply,
-        "Cancel",
+      // A picker that stays open while the diff editors are scrolled
+      // (a modal blocks them; a notification hides itself).
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: apply, apply: true },
+          { label: "Cancel", apply: false },
+        ],
+        {
+          title: `${verb}: review the diffs, then apply or cancel`,
+          ignoreFocusOut: true,
+        },
       );
+      choice = pick?.apply ? apply : undefined;
     }
     if (choice !== apply) {
       return;
