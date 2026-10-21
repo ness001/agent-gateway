@@ -502,3 +502,133 @@ suite("protocol/core missing tool-call recovery", () => {
     assert.strictEqual(attempts, 1);
   });
 });
+
+suite("protocol/core Copilot context budget", () => {
+  for (const protocol of [
+    "anthropic",
+    "openai-responses",
+    "openai-chat",
+    "gemini",
+  ] as const) {
+    test(`${protocol} sends advertised context budget to Copilot, separately from output`, async () => {
+      const model = Object.assign(
+        fakeModel(() => parts([new TextPart("ok")])),
+        { vendor: "copilot", maxInputTokens: 921793 },
+      );
+      const result = await runTurn({
+        api,
+        model,
+        req: req({ protocol, maxOutputTokens: 32000 }),
+        scope: new FakeScope(),
+        encoder,
+        sink: new CollectSink<string>(),
+      });
+      assert.strictEqual(result.outcome, "completed");
+      const options = model.sent!.options as {
+        configuration?: { contextSize: number };
+        modelOptions: Record<string, unknown>;
+      };
+      assert.strictEqual(options.configuration?.contextSize, 921793);
+      assert.strictEqual(options.modelOptions.max_tokens, 32000);
+      assert.strictEqual(options.modelOptions.contextSize, undefined);
+    });
+  }
+
+  test("hosted follow-up and recovery retry retain explicit context configuration", async () => {
+    let attempts = 0;
+    const model = Object.assign(
+      fakeModel(() => parts([])),
+      { vendor: "copilot", maxInputTokens: 921793 },
+    );
+    model.sendRequest = async (_messages, options) => {
+      attempts++;
+      assert.strictEqual(
+        (options as { configuration?: { contextSize: number } }).configuration
+          ?.contextSize,
+        921793,
+      );
+      if (attempts === 2) {
+        throw new Error(
+          "No tool call found for function call output with call_id call_test.",
+        );
+      }
+      return { stream: parts([new TextPart("ok")]) };
+    };
+    const hook: HostedHook = {
+      async *wrap(events, context) {
+        for await (const event of events) {
+          if (event.e !== "end") {
+            yield event;
+          }
+        }
+        yield* context.callModel(
+          req({
+            turns: [
+              {
+                role: "assistant",
+                parts: [
+                  {
+                    type: "toolCall",
+                    id: "call_test",
+                    name: "read",
+                    input: {},
+                  },
+                ],
+              },
+              {
+                role: "user",
+                parts: [
+                  {
+                    type: "toolResult",
+                    callId: "call_test",
+                    content: [{ type: "text", text: "result" }],
+                    isError: false,
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+      },
+    };
+    const result = await runTurn({
+      api,
+      model,
+      req: req(),
+      scope: new FakeScope(),
+      encoder,
+      sink: new CollectSink<string>(),
+      hosted: hook,
+    });
+    assert.strictEqual(result.outcome, "completed");
+    assert.strictEqual(attempts, 3);
+  });
+
+  for (const [vendor, capacity] of [
+    ["other", 921793],
+    ["copilot", 0],
+    ["copilot", -1],
+    ["copilot", NaN],
+    ["copilot", Infinity],
+    ["copilot", 1.5],
+  ] as const) {
+    test(`does not invent configuration for vendor=${vendor}, capacity=${capacity}`, async () => {
+      const model = Object.assign(
+        fakeModel(() => parts([])),
+        { vendor, maxInputTokens: capacity },
+      );
+      await runTurn({
+        api,
+        model,
+        req: req(),
+        scope: new FakeScope(),
+        encoder,
+        sink: new CollectSink<string>(),
+      });
+      assert.strictEqual(
+        (model.sent!.options as { configuration?: unknown }).configuration,
+        undefined,
+      );
+    });
+  }
+});
