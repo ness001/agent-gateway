@@ -191,6 +191,16 @@ Search queries, results and page text are never logged.
 
 ### Known issues
 
+- **Codex browser/computer-use tools report "Codex auth token is unavailable":**
+  this is expected when the Codex browser connector cannot obtain its required
+  auth token, including gateway-only sessions without a Codex sign-in. Model
+  requests can still work through Agent Gateway: the browser connector uses a
+  separate authentication path, even though it controls a local browser.
+  Agent Gateway does not supply or inject that token. Check your sign-in in
+  Codex and retry; if already signed in, investigate Codex's connector/auth state.
+  See [Codex authentication](https://developers.openai.com/codex/auth).
+  This error alone does not mean Playwright or `agent-browser` is unavailable;
+  those use separate connections. It is not a gateway model-request failure.
 - **Antigravity CLI fails with "invalid stream chunk: : ping":** during a long
   pause the gateway sends a standard keep-alive line on the stream, and
   Antigravity CLI 1.4.3 does not accept it. Other agents are not affected.
