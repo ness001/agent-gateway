@@ -88,7 +88,9 @@ its own entries.
 
 `GET /v1/models` lists your Copilot models, remote models as
 `<remote>--<model>`, and `gateway-claude-<model>` aliases that let Claude Code
-show every model.
+show every model. **Configure Coding Agents** writes the selected model's
+`gateway-claude-` alias to Claude Code's `ANTHROPIC_MODEL` setting; other
+clients keep the selected model ID. Existing aliases are not prefixed again.
 
 ### Unknown models and aliases
 

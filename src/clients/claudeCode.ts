@@ -1,6 +1,7 @@
 import { ParseError, applyEdits, modify, parse } from "jsonc-parser";
 import * as path from "path";
 
+import { ALIAS_PREFIX } from "../gateway/catalog";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -71,7 +72,10 @@ function desiredValues(input: ClientConfigInput): Record<string, string> {
     ANTHROPIC_BASE_URL: input.gatewayUrl,
     ANTHROPIC_AUTH_TOKEN: input.apiKey || PLACEHOLDER_API_KEY,
     CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
-    ANTHROPIC_MODEL: input.defaultModel,
+    // Use the catalog's Claude-compatible alias only for this client.
+    ANTHROPIC_MODEL: input.defaultModel.startsWith(ALIAS_PREFIX)
+      ? input.defaultModel
+      : ALIAS_PREFIX + input.defaultModel,
     CLAUDE_CODE_AUTO_MODE_SERVER: "0",
   };
 }
@@ -96,7 +100,7 @@ export const claudeCodeAdapter: ClientAdapter = {
     const desired = desiredValues(input);
     let text = before && before.trim() ? before : "{}\n";
     const summary = [
-      `Set env ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_MODEL=${input.defaultModel}, gateway model discovery and CLAUDE_CODE_AUTO_MODE_SERVER=0 in ${file}.`,
+      `Set env ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_MODEL=${desired.ANTHROPIC_MODEL}, gateway model discovery and CLAUDE_CODE_AUTO_MODE_SERVER=0 in ${file}.`,
     ];
     if (!(PREVIOUS_KEY in env)) {
       const previous: Record<string, unknown> = {};
