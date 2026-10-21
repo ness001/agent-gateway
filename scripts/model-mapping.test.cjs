@@ -247,3 +247,124 @@ test("review displays and saves an empty suggestion without inventing a target",
   assert.equal(writes[0][1]["claude-sonnet-5"], "");
   assert.equal(writes[0][1]["claude-haiku-5.5"], "");
 });
+
+test("fallback reopening lists saved and default mappings and edits without AI", async () => {
+  reset();
+  aliases = { custom: "balanced", "claude-haiku-5.5": "fast" };
+  const pick = vscode.window.showQuickPick;
+  vscode.window.showQuickPick = async (items, options) => {
+    if (options.title === "Fallback model for unknown model names") {
+      assert.ok(
+        items.some(
+          (i) => i.action === "editMapping" && i.id === "claude-sonnet-5",
+        ),
+      );
+      assert.ok(
+        items.some((i) => i.action === "editMapping" && i.id === "custom"),
+      );
+      const row = items.find(
+        (i) => i.action === "editMapping" && i.id === "claude-haiku-5.5",
+      );
+      assert.ok(row.description.includes("fast"));
+      return row;
+    }
+    return items.find((i) => i.id === "balanced");
+  };
+  try {
+    await setFallbackModel(gw);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0][0], "modelAliases");
+    assert.equal(writes[0][1]["claude-haiku-5.5"], "balanced");
+    assert.equal(writes[0][1].custom, "balanced");
+    assert.equal(prompts.length, 0);
+  } finally {
+    vscode.window.showQuickPick = pick;
+  }
+});
+for (const cancelled of [true, false]) {
+  test(`manual mapping clear/cancel (cancel=${cancelled})`, async () => {
+    reset();
+    aliases = { "claude-haiku-5.5": "fast", custom: "balanced" };
+    workspace = true;
+    const pick = vscode.window.showQuickPick;
+    vscode.window.showQuickPick = async (items, options) =>
+      options.title === "Fallback model for unknown model names"
+        ? items.find(
+            (i) => i.action === "editMapping" && i.id === "claude-haiku-5.5",
+          )
+        : cancelled
+          ? undefined
+          : items.find((i) => i.id === "");
+    try {
+      await setFallbackModel(gw);
+      if (cancelled) {
+        assert.equal(writes.length, 0);
+      } else {
+        assert.deepEqual(writes, [
+          ["modelAliases", { "claude-haiku-5.5": "", custom: "balanced" }, 2],
+        ]);
+      }
+    } finally {
+      vscode.window.showQuickPick = pick;
+    }
+  });
+}
+test("empty catalog still lets users clear a stale mapping", async () => {
+  reset();
+  aliases = { "claude-haiku-5.5": "removed" };
+  const pick = vscode.window.showQuickPick;
+  vscode.window.showQuickPick = async (items, options) =>
+    options.title === "Fallback model for unknown model names"
+      ? items.find(
+          (i) => i.action === "editMapping" && i.id === "claude-haiku-5.5",
+        )
+      : items.find((i) => i.id === "");
+  try {
+    await setFallbackModel({ ...gw, nativeModels: () => [] });
+    assert.equal(writes[0][1]["claude-haiku-5.5"], "");
+  } finally {
+    vscode.window.showQuickPick = pick;
+  }
+});
+
+for (const scenario of [
+  "unchanged",
+  "concurrent",
+  "unavailable",
+  "write failure",
+]) {
+  test(`manual mapping ${scenario} does not confirm an unsafe write`, async () => {
+    reset();
+    aliases = { "claude-haiku-5.5": "fast", custom: "balanced" };
+    const pick = vscode.window.showQuickPick;
+    const update = config.update;
+    let removed = false;
+    vscode.window.showQuickPick = async (items, options) => {
+      if (options.title === "Fallback model for unknown model names")
+        return items.find(
+          (i) => i.action === "editMapping" && i.id === "claude-haiku-5.5",
+        );
+      if (scenario === "concurrent") aliases = { concurrent: "fast" };
+      if (scenario === "unavailable") removed = true;
+      return items.find(
+        (i) => i.id === (scenario === "unchanged" ? "fast" : "balanced"),
+      );
+    };
+    if (scenario === "write failure")
+      config.update = async () => {
+        throw new Error("failed");
+      };
+    try {
+      await setFallbackModel({
+        ...gw,
+        nativeModels: () => (removed ? [] : catalog),
+      });
+      assert.equal(writes.length, 0);
+      assert.equal(notices.length, 0);
+      assert.equal(errors.length, scenario === "unchanged" ? 0 : 1);
+    } finally {
+      vscode.window.showQuickPick = pick;
+      config.update = update;
+    }
+  });
+}
