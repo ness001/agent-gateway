@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.2
+
+- Add AI-assisted model mapping initialization and manual editing in **Set
+  Fallback Model**, including empty Haiku/Sonnet defaults and review before save.
+- Add **Status > Change log level**, applied without restarting the gateway.
+- Configure Claude Code with gateway model aliases and a 128,000-token output
+  budget; configure agent context windows from available model metadata.
+- Pass Copilot's advertised input budget on every model request to avoid
+  unintended history trimming at a smaller default context size.
+- Recover pre-output missing-tool-call rejections once without re-running tools,
+  and preserve resumed tool results that have no call IDs.
+- Normalize parallel Anthropic tool history without false reorder warnings;
+  retain diagnostics for missing, orphaned, duplicate and late results.
+- Document the separate authentication requirement for Codex browser tools.
+
 ## 0.1.1
 
 - **Configure Coding Agents** pre-selects only agents already set up for the
