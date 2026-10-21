@@ -130,6 +130,9 @@ export const clineAdapter: ClientAdapter = {
     const summary = [
       `Set Cline provider "${PROVIDER}" to ${baseUrl(input)} with model ${input.defaultModel} in ${target}.`,
     ];
+    summary.push(
+      "Cline CLI: this adapter has no verified context-window setting; no context override is written.",
+    );
     if (current !== undefined && !isGatewayEntry(current, input)) {
       summary.push(
         `Replaces the existing "${PROVIDER}" entry (base URL ${String(current.settings?.baseUrl)}); a backup is kept.`,

@@ -84,6 +84,28 @@ Each changed file is backed up next to itself as
 `<file>.agent-gateway-<YYYYMMDDHHmmss>.bak`. Removing the gateway reverts only
 its own entries.
 
+### Context-window configuration
+
+Configure Coding Agents copies valid positive integer context capacities from the
+gateway model metadata, not from model names or output-token limits.
+
+| Agent | Context configuration |
+| --- | --- |
+| Claude Code | Selected model: `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` |
+| Codex | Selected model: `model_context_window` |
+| Pi, OpenClaw, DeepSeek Harness | Per-model `contextWindow` in their existing model lists |
+| Kilo | Per-model `limit.context`, even when output metadata is unavailable |
+| Hermes | Per-model `providers.agent-gateway.models.<id>.context_length`; a user-pinned global context setting may take precedence |
+| Oh My Pi | Existing model discovery reads gateway metadata; no static override is written |
+| Cline CLI, Cursor, Antigravity | No verified context-setting support in these adapters; no override is written |
+
+Claude Code and Codex replace the existing context override and record it for
+restoration on unconfigure, including upgrades of older gateway configurations.
+Reconfigure after changing models: their context overrides are session-wide,
+not a dynamic per-request selection. Missing or invalid metadata is never guessed;
+any previously managed context override is restored rather than left stale.
+Output budgets and compaction-percentage settings are separate and unchanged.
+
 ## Models
 
 `GET /v1/models` lists your Copilot models, remote models as

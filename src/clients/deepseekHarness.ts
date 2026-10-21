@@ -1,6 +1,7 @@
 import * as path from "path";
 import { YAMLMap, YAMLSeq, isMap, isSeq, parseDocument } from "yaml";
 
+import { validContextWindow } from "./contextWindow";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -109,8 +110,9 @@ function route(input: ClientConfigInput) {
           ? ["text", "image"]
           : ["text"],
       };
-      if (m.contextWindow) {
-        entry.contextWindow = m.contextWindow;
+      const contextWindow = validContextWindow(m.contextWindow);
+      if (contextWindow !== undefined) {
+        entry.contextWindow = contextWindow;
       }
       if (m.maxOutputTokens) {
         entry.maxTokens = m.maxOutputTokens;
