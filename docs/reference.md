@@ -234,6 +234,10 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   with the settings sent to the model (output limit, reasoning, tool count,
   whether a cache key was present), warnings for repaired tool-call history,
   fallbacks and client disconnects. `debug` adds provider error messages.
+- **Status** > **Change log level**: select `error`, `warn`, `info`, or `debug`.
+  Applies immediately without restarting; updates an existing workspace override,
+  otherwise your user setting. For debug output, also select Debug for the
+  Agent Gateway output channel in VS Code if its log filter hides those messages.
 - **Error log** (**Status** > **Open error log**): one JSON line per failed
   request, kept for 7 days.
 - **Status** > **Copy health details**: the `/health` snapshot with recent

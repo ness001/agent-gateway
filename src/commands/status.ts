@@ -3,7 +3,9 @@ import * as vscode from "vscode";
 
 import type { Gateway } from "../gateway/gateway";
 import type { HealthSnapshot } from "../gateway/health";
+import { CONFIG_SECTION, type GatewayLogLevel } from "../utils/config";
 import { logger } from "../utils/logger";
+import { changeLogLevel } from "./logLevel";
 import { remoteStateText } from "./remotes";
 
 export const RECENT_ERRORS_SHOWN = 5;
@@ -15,6 +17,7 @@ export type StatusAction =
   | "copyHealth"
   | "openErrorLog"
   | "showLog"
+  | "logLevel"
   | "setApiKey"
   | "remotes"
   | "webSearch"
@@ -35,6 +38,7 @@ const ACTIONS: [StatusAction, string, string?][] = [
   ["copyHealth", "$(copy) Copy health details"],
   ["openErrorLog", "$(file) Open error log", "Failed requests, last 7 days"],
   ["showLog", "$(output) Show output log"],
+  ["logLevel", "$(settings-gear) Change log level"],
   ["setApiKey", "$(key) Set gateway API key"],
   ["remotes", "$(remote) Manage remote upstreams"],
   ["webSearch", "$(search) Web search and fetch"],
@@ -42,7 +46,10 @@ const ACTIONS: [StatusAction, string, string?][] = [
 ];
 
 /** Items of the Status picker: state lines, recent errors, then actions. */
-export function statusItems(h: HealthSnapshot): StatusItem[] {
+export function statusItems(
+  h: HealthSnapshot,
+  logLevel: GatewayLogLevel = "info",
+): StatusItem[] {
   const recent = h.errors.recent.slice(0, RECENT_ERRORS_SHOWN);
   return [
     { label: `Status: ${h.status}` },
@@ -78,7 +85,7 @@ export function statusItems(h: HealthSnapshot): StatusItem[] {
     { label: "Actions", separator: true },
     ...ACTIONS.map(([action, label, description]) => ({
       label,
-      description,
+      description: action === "logLevel" ? `Current: ${logLevel}` : description,
       action,
     })),
   ];
@@ -114,9 +121,15 @@ export async function copyHealth(gw: Gateway): Promise<void> {
 
 export async function showStatus(
   gw: Gateway,
-  run: Record<Exclude<StatusAction, "showLog">, () => Thenable<unknown>>,
+  run: Record<
+    Exclude<StatusAction, "showLog" | "logLevel">,
+    () => Thenable<unknown>
+  >,
 ): Promise<void> {
-  const items = statusItems(gw.health()).map((i) => ({
+  const level = vscode.workspace
+    .getConfiguration(CONFIG_SECTION)
+    .get<GatewayLogLevel>("logLevel", "info");
+  const items = statusItems(gw.health(), level).map((i) => ({
     ...i,
     kind: i.separator ? vscode.QuickPickItemKind.Separator : undefined,
   }));
@@ -128,6 +141,10 @@ export async function showStatus(
   }
   if (picked.action === "showLog") {
     logger.show();
+    return;
+  }
+  if (picked.action === "logLevel") {
+    await changeLogLevel();
     return;
   }
   await run[picked.action]();
