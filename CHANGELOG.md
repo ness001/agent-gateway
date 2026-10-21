@@ -4,6 +4,8 @@
 
 - **Configure Coding Agents** pre-selects only agents already set up for the
   gateway; other installed agents start unselected.
+- The confirmation dialog lists only the agents that will change; details
+  are in **Show diff** and in the report shown after applying.
 - **Show diff** no longer covers the diff with the confirmation dialog; apply
   or cancel from a picker that stays open while the diffs stay scrollable.
 

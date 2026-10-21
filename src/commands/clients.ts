@@ -257,11 +257,11 @@ export async function runClientConfiguration(
   const changed = plans.flatMap(([, p]) =>
     p.changes.filter((c) => c.before !== c.after),
   );
+  // Only the agents whose files change; details are in Show diff.
   const preview = [
-    ...plans.flatMap(([a, p]) => [
-      `${a.label}:`,
-      ...p.summary.map((s) => `  - ${s}`),
-    ]),
+    ...plans
+      .filter(([, p]) => p.changes.some((c) => c.before !== c.after))
+      .map(([a]) => `- ${a.label}`),
     ...failures.map((f) => `Skipped ${f}`),
   ].join("\n");
 
