@@ -114,7 +114,7 @@ suite("configured context windows", () => {
       {},
     );
   });
-  test("Claude writes selected capacity and preserves output and compaction settings", () => {
+  test("Claude writes selected capacity and output budget, preserving compaction settings", () => {
     const before = JSON.stringify({
       env: {
         CLAUDE_CODE_MAX_CONTEXT_TOKENS: "200000",
@@ -127,7 +127,7 @@ suite("configured context windows", () => {
       parse(once).env.CLAUDE_CODE_MAX_CONTEXT_TOKENS,
       "900000",
     );
-    assert.strictEqual(parse(once).env.CLAUDE_CODE_MAX_OUTPUT_TOKENS, "32000");
+    assert.strictEqual(parse(once).env.CLAUDE_CODE_MAX_OUTPUT_TOKENS, "128000");
     assert.strictEqual(parse(once).env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, "85");
     assert.strictEqual(claude(once), once);
     const back = claudeCodeAdapter.unplan(input, { [claudeFile]: once })

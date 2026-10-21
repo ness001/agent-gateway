@@ -190,11 +190,11 @@ export const claudeCodeAdapter: ClientAdapter = {
       previous[OUTPUT_KEY] = OUTPUT_KEY in env ? env[OUTPUT_KEY] : null;
       text = setValue(text, ["env", PREVIOUS_KEY], JSON.stringify(previous));
     }
-    if (!(OUTPUT_KEY in env)) {
+    if (env[OUTPUT_KEY] !== DEFAULT_OUTPUT_TOKENS) {
       text = setValue(text, ["env", OUTPUT_KEY], DEFAULT_OUTPUT_TOKENS);
     }
     summary.push(
-      `${OUTPUT_KEY}=${env[OUTPUT_KEY] ?? DEFAULT_OUTPUT_TOKENS} (${OUTPUT_KEY in env ? "preserved existing value" : "gateway default"}).`,
+      `Set ${OUTPUT_KEY}=${DEFAULT_OUTPUT_TOKENS} (overrides the existing output budget).`,
     );
     text = configureContext(text, input, summary);
     summary.push(`If /model does not list gateway models, delete ${cache}.`);
