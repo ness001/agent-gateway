@@ -162,6 +162,27 @@ Keys are stored in VS Code secret storage, never in `settings.json`. For Codex,
 the command also offers to turn on its live search (`web_search = "live"`).
 Search queries, results and page text are never logged.
 
+### AI-assisted model mappings
+
+Run **Set Fallback Model** > **Initialize model mappings with AI…** to suggest
+which available local models should answer an agent's default model names.
+Enter exact requested IDs, such as `claude-haiku-5.5` and `claude-sonnet-5`,
+then choose a Copilot model to make recommendations. The default list is editable;
+include alternate spellings explicitly when your agent uses them.
+
+The advisor sees only those IDs and available model metadata, not your files or
+conversation. This uses Copilot quota. It matches lightweight, balanced and
+reasoning roles, but its suggestions are not measured performance rankings.
+Only existing local targets compatible with Anthropic messages are accepted;
+remote models and models known not to support tools are excluded.
+
+Review the suggested pairs and reasons, then select which ones to save to
+`agentGateway.modelAliases`. Existing mappings (including disabled entries) are
+unchecked by default; select one explicitly to replace it. Unrelated mappings
+and the fallback model remain unchanged. Canceling saves nothing. Settings apply
+without a gateway restart; an existing workspace override is updated there,
+otherwise the mappings are saved in user settings.
+
 ## Settings
 
 | Setting                                        | Default | Description                                                        |
