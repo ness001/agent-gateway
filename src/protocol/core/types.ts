@@ -228,6 +228,7 @@ export interface CoreRequest {
 /** Structural subset of `vscode.LanguageModelChat` used by the core. */
 export interface LmChatLike {
   readonly id: string;
+  readonly vendor?: string;
   readonly name?: string;
   readonly family?: string;
   readonly maxInputTokens: number;
