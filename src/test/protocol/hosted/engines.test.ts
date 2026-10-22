@@ -83,7 +83,7 @@ suite("protocol/hosted/engines", () => {
     assert.ok(createHostedEngines("exa", {}, 5)?.search);
   });
 
-  for (const id of ["tavily", "you"] as const) {
+  for (const id of ["tavily", "you", "kagi"] as const) {
     test(`1 ${id} without key makes zero network calls`, async () => {
       const { calls, f } = stub(() => ({}));
       const e = createEngine(id, { fetchImpl: f });
@@ -334,5 +334,198 @@ suite("protocol/hosted/engines", () => {
       }),
     );
     assert.equal(r[0].url, "https://a.example");
+  });
+});
+
+suite("protocol/hosted/brave-kagi", () => {
+  test("brave needs a key and never exposes a fetch engine", async () => {
+    const { calls, f } = stub(() => ({}));
+    const e = createEngine("brave", { fetchImpl: f });
+    await assert.rejects(
+      e.search("q", {}, sig()),
+      (err: unknown) =>
+        err instanceof EngineError && err.code === "missing_key",
+    );
+    assert.deepEqual(await e.fetch(["https://example.com"], sig()), [
+      { url: "https://example.com", status: "error" },
+    ]);
+    assert.equal(calls.length, 0);
+    const hosted = createHostedEngines("brave", {}, 5);
+    assert.ok(hosted?.search);
+    assert.equal(hosted?.fetch, undefined);
+    assert.ok(createHostedEngines("kagi", {}, 5)?.fetch);
+  });
+
+  for (const id of ["brave", "kagi"] as const) {
+    test(`${id} encodes queries, maps results and applies domain and count limits`, async () => {
+      const hits = [
+        {
+          url: "https://blocked.example.com/",
+          title: "Blocked",
+          description: "bad",
+          snippet: "bad",
+        },
+        {
+          url: "https://example.com/a",
+          title: "A",
+          description: "alpha",
+          snippet: "alpha",
+          page_age: "2026-01-01",
+          time: "2026-01-01",
+        },
+        {
+          url: "https://sub.example.com/b",
+          title: "B",
+          description: "beta",
+          snippet: "beta",
+        },
+        { title: "missing URL" },
+        { url: "https://elsewhere.test/", title: "Other" },
+      ];
+      const { calls, f } = stub(() =>
+        id === "brave"
+          ? { web: { results: hits } }
+          : { data: { search: hits } },
+      );
+      const e = createEngine(id, { fetchImpl: f, apiKey: " test-key " });
+      const query = "space & unicode caf�?#";
+      const result = await e.search(
+        query,
+        {
+          maxResults: 1,
+          allowedDomains: ["example.com"],
+          blockedDomains: ["blocked.example.com"],
+        },
+        sig(),
+      );
+      assert.deepEqual(result, [
+        {
+          url: "https://example.com/a",
+          title: "A",
+          snippet: "alpha",
+          publishedAt: "2026-01-01",
+        },
+      ]);
+      const call = calls[0];
+      if (id === "brave") {
+        const url = new URL(call.url);
+        assert.equal(
+          url.origin + url.pathname,
+          "https://api.search.brave.com/res/v1/web/search",
+        );
+        assert.equal(url.searchParams.get("q"), query);
+        assert.equal(url.searchParams.get("count"), "1");
+        assert.equal(url.searchParams.get("text_decorations"), "false");
+        assert.equal(call.method, "GET");
+        assert.equal(call.headers["X-Subscription-Token"], "test-key");
+      } else {
+        assert.equal(call.url, "https://kagi.com/api/v1/search");
+        assert.equal(call.method, "POST");
+        assert.equal(call.headers.Authorization, "Bearer test-key");
+        assert.deepEqual(call.body, { query, limit: 1 });
+      }
+      assert.ok(!call.url.includes("test-key"));
+    });
+
+    test(`${id} handles empty responses and sanitized HTTP/parse failures`, async () => {
+      const empty = stub(() => ({}));
+      assert.deepEqual(
+        await createEngine(id, { apiKey: "key", fetchImpl: empty.f }).search(
+          "q",
+          {},
+          sig(),
+        ),
+        [],
+      );
+      for (const status of [401, 429, 500]) {
+        const { f } = stub(() => "private query and key", status);
+        await assert.rejects(
+          createEngine(id, { apiKey: "key", fetchImpl: f }).search(
+            "q",
+            {},
+            sig(),
+          ),
+          (e: unknown) =>
+            e instanceof EngineError &&
+            e.status === status &&
+            e.message === `engine http ${status}`,
+        );
+      }
+      const malformed = stub(() => "not json");
+      await assert.rejects(
+        createEngine(id, { apiKey: "key", fetchImpl: malformed.f }).search(
+          "q",
+          {},
+          sig(),
+        ),
+        (e: unknown) => e instanceof EngineError && e.code === "parse",
+      );
+    });
+
+    test(`${id} propagates cancellation`, async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const f: FetchLike = async (_url, init) => {
+        init.signal.throwIfAborted();
+        throw new Error("unreachable");
+      };
+      await assert.rejects(
+        createEngine(id, { apiKey: "key", fetchImpl: f }).search(
+          "q",
+          {},
+          controller.signal,
+        ),
+        (e: unknown) => e === controller.signal.reason,
+      );
+    });
+  }
+
+  test("kagi extract batches, preserves order, caps text and reports per-page failures", async () => {
+    const urls = Array.from(
+      { length: 11 },
+      (_, i) => `https://example.com/${i}`,
+    );
+    const { calls, f } = stub((call) => {
+      assert.equal(call.url, "https://kagi.com/api/v1/extract");
+      assert.equal(call.method, "POST");
+      assert.equal(call.headers.Authorization, "Bearer key");
+      const pages = (call.body as { pages: { url: string }[] }).pages;
+      assert.ok(pages.length <= 10);
+      return {
+        data: pages
+          .slice()
+          .reverse()
+          .map(({ url }) => ({
+            url,
+            markdown: url === urls[0] ? "x".repeat(MAX_PAGE_CHARS + 1) : "page",
+            error: url === urls[1] ? "private failure" : undefined,
+          })),
+      };
+    });
+    const results = await createEngine("kagi", {
+      apiKey: "key",
+      fetchImpl: f,
+    }).fetch(urls, sig());
+    assert.equal(calls.length, 2);
+    assert.deepEqual(
+      results.map((r) => r.url),
+      urls,
+    );
+    assert.ok(results[0].text?.endsWith(TRUNCATION_MARKER));
+    assert.deepEqual(results[1], { url: urls[1], status: "error" });
+    assert.equal(results[10].text, "page");
+  });
+
+  test("kagi rejects API error envelopes without disclosing their text", async () => {
+    const { f } = stub(() => ({ error: [{ message: "private query" }] }));
+    const e = createEngine("kagi", { apiKey: "key", fetchImpl: f });
+    await assert.rejects(
+      e.search("q", {}, sig()),
+      (err: unknown) =>
+        err instanceof EngineError && err.message === "engine parse",
+    );
+    assert.deepEqual(await e.fetch(["https://example.com"], sig()), [
+      { url: "https://example.com", status: "error" },
+    ]);
   });
 });

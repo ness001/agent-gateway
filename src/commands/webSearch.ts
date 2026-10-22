@@ -15,9 +15,12 @@ export function engineCapabilityText(engine: WebSearchEngineInfo): string {
   const search = engine.anonymous
     ? "search works without a key (rate-limited)"
     : "search requires an API key";
-  const fetch = engine.fetchAnonymous
-    ? "URL fetch works without a key"
-    : "URL fetch requires an API key";
+  const fetch =
+    engine.supportsFetch === false
+      ? "URL fetch is not supported"
+      : engine.fetchAnonymous
+        ? "URL fetch works without a key"
+        : "URL fetch requires an API key";
   return `${search}; ${fetch}.`;
 }
 

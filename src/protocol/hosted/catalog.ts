@@ -24,6 +24,8 @@ export interface WebSearchEngineInfo {
   anonymous: boolean;
   /** URL fetch works without an API key. */
   fetchAnonymous: boolean;
+  /** False for search-only engines; omitted means fetch is supported. */
+  supportsFetch?: boolean;
   /** Prompt text for the API-key input box. */
   keyHint: string;
   /** Where to create an API key. */
@@ -32,6 +34,23 @@ export interface WebSearchEngineInfo {
 
 /** Mirrors the `meta` of the engines in protocol/hosted/engines. */
 export const WEB_SEARCH_ENGINES: readonly WebSearchEngineInfo[] = [
+  {
+    id: "brave",
+    label: "Brave Search",
+    anonymous: false,
+    fetchAnonymous: false,
+    supportsFetch: false,
+    keyHint: "Brave Search API key",
+    signupUrl: "https://api-dashboard.search.brave.com/app/keys",
+  },
+  {
+    id: "kagi",
+    label: "Kagi",
+    anonymous: false,
+    fetchAnonymous: false,
+    keyHint: "Kagi API key",
+    signupUrl: "https://kagi.com/api/keys",
+  },
   {
     id: "exa",
     label: "Exa",

@@ -13,7 +13,9 @@ export type WebSearchProviderName =
   | "firecrawl"
   | "tavily"
   | "jina"
-  | "you";
+  | "you"
+  | "brave"
+  | "kagi";
 
 export interface GatewayConfiguration {
   enabled: boolean;
