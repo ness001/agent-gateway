@@ -1,5 +1,12 @@
 /** Engine identifiers configurable via `agentGateway.webSearch.provider`. */
-export type WebSearchEngineId = "exa" | "firecrawl" | "tavily" | "jina" | "you";
+export type WebSearchEngineId =
+  | "exa"
+  | "firecrawl"
+  | "tavily"
+  | "jina"
+  | "you"
+  | "brave"
+  | "kagi";
 
 /** Static facts about an engine, used by commands and the no-provider policy. */
 export interface EngineMetadata {

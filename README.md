@@ -151,6 +151,8 @@ free anonymous endpoint where there is one.
 | Jina AI   | Fetch only                      |
 | Tavily    | Needs a key                     |
 | You.com   | Needs a key                     |
+| Brave Search | Needs a key (search only)     |
+| Kagi      | Needs a key                     |
 
 Keys are stored in VS Code secret storage, never in `settings.json`. For Codex,
 the command also offers to turn on its live search (`web_search = "live"`).
