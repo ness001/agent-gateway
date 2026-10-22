@@ -293,9 +293,11 @@ suite("commands/webSearch", () => {
       const detail = items.find((i) => i.id === e.id)?.detail ?? "";
       assert.ok(
         detail.includes(
-          e.fetchAnonymous
-            ? "URL fetch works without a key"
-            : "URL fetch requires an API key",
+          e.supportsFetch === false
+            ? "URL fetch is not supported"
+            : e.fetchAnonymous
+              ? "URL fetch works without a key"
+              : "URL fetch requires an API key",
         ),
       );
       assert.ok(

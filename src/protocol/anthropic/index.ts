@@ -122,6 +122,7 @@ export async function handleAnthropic(
     let req = decodeMessagesRequest(body, {
       countTokens: isCount,
       hostedSearch: deps.hosted?.search !== undefined,
+      hostedFetch: deps.hosted?.fetch !== undefined,
       logger: runtime.logger,
     });
     const model = lookupModel(deps, req.model);

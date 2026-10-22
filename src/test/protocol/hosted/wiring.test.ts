@@ -1046,3 +1046,35 @@ suite("protocol/hosted Sources list", () => {
     assert.ok(parts.some((p) => p.text === LIST));
   });
 });
+
+suite("protocol/hosted/search-only provider", () => {
+  const body = {
+    model: "test",
+    max_tokens: 100,
+    messages: [{ role: "user", content: "test" }],
+    tools: [
+      { type: "web_search_20250305", name: "web_search" },
+      { type: "web_fetch_20250910", name: "web_fetch" },
+    ],
+  };
+  test("drops optional fetch but keeps search", () => {
+    const req = decodeMessagesRequest(body, {
+      hostedSearch: true,
+      hostedFetch: false,
+    });
+    assert.deepEqual(
+      req.hosted.map((h) => h.kind),
+      ["search"],
+    );
+  });
+  test("rejects forced fetch instead of silently answering without it", () => {
+    assert.throws(
+      () =>
+        decodeMessagesRequest(
+          { ...body, tool_choice: { type: "tool", name: "web_fetch" } },
+          { hostedSearch: true, hostedFetch: false },
+        ),
+      /not available/,
+    );
+  });
+});
