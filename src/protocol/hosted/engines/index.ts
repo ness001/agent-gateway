@@ -1,8 +1,10 @@
 import type { HostedEngines, WebSearchEngineId } from "../types";
+import { createBraveEngine } from "./brave";
 import type { Engine, EngineDeps, EngineFactory } from "./engine";
 import { createExaEngine } from "./exa";
 import { createFirecrawlEngine } from "./firecrawl";
 import { createJinaEngine } from "./jina";
+import { createKagiEngine } from "./kagi";
 import { createTavilyEngine } from "./tavily";
 import { createYouEngine } from "./you";
 
@@ -12,6 +14,8 @@ export const ENGINE_FACTORIES: Record<WebSearchEngineId, EngineFactory> = {
   tavily: createTavilyEngine,
   jina: createJinaEngine,
   you: createYouEngine,
+  brave: createBraveEngine,
+  kagi: createKagiEngine,
 };
 
 export function createEngine(id: WebSearchEngineId, deps: EngineDeps): Engine {
@@ -31,5 +35,9 @@ export function createHostedEngines(
     return undefined;
   }
   const e = createEngine(provider, deps);
-  return { search: e, fetch: e, maxSearchesPerRequest };
+  return {
+    search: e,
+    fetch: e.meta.supportsFetch ? e : undefined,
+    maxSearchesPerRequest,
+  };
 }

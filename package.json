@@ -112,7 +112,9 @@
             "firecrawl",
             "tavily",
             "jina",
-            "you"
+            "you",
+            "brave",
+            "kagi"
           ],
           "enumDescriptions": [
             "Off: web-search requests fail and no search service is contacted.",
@@ -120,7 +122,9 @@
             "Firecrawl: works without a key (rate-limited); a key raises the limits.",
             "Tavily: requires an API key.",
             "Jina AI Search: requires an API key.",
-            "You.com: requires an API key."
+            "You.com: requires an API key.",
+            "Brave Search: requires an API key; URL fetch is not supported.",
+            "Kagi: search and URL fetch require an API key."
           ],
           "default": "none",
           "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Web Search and Fetch** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."

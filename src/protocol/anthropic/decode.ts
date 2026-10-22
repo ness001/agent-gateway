@@ -421,6 +421,7 @@ function decodeToolChoice(
   v: unknown,
   decoded: DecodedTools,
   hostedSearch: boolean,
+  hostedFetch: boolean,
 ): { mode: ToolMode; parallel?: boolean } {
   const tools = decoded.tools;
   if (v === undefined || v === null) {
@@ -447,7 +448,10 @@ function decodeToolChoice(
       const name = needStr(c.name, "tool_choice.name");
       const h = decoded.hosted.get(name);
       if (h && !tools.some((t) => t.name === name)) {
-        if (!h.tool || !hostedSearch) {
+        if (
+          !h.tool ||
+          !(h.tool.kind === "fetch" ? hostedFetch : hostedSearch)
+        ) {
           // A forced hosted tool that cannot run.
           throw new GatewayError(
             "tool_unavailable",
@@ -540,6 +544,8 @@ export interface DecodeOptions {
   countTokens?: boolean;
   /** True when a web search engine is configured. */
   hostedSearch?: boolean;
+  /** Defaults to hostedSearch for callers with a combined engine. */
+  hostedFetch?: boolean;
   logger?: CoreLogger;
 }
 
@@ -569,17 +575,25 @@ export function decodeMessagesRequest(
   const decodedTools = decodeTools(body.tools);
   const tools = decodedTools.tools;
   const hostedSearch = opts.hostedSearch === true;
-  const choice = decodeToolChoice(body.tool_choice, decodedTools, hostedSearch);
+  const hostedFetch = opts.hostedFetch ?? hostedSearch;
+  const choice = decodeToolChoice(
+    body.tool_choice,
+    decodedTools,
+    hostedSearch,
+    hostedFetch,
+  );
   // Without a provider an optional hosted tool is dropped.
-  const hosted = hostedSearch
-    ? [...decodedTools.hosted.values()].flatMap((h) => (h.tool ? [h.tool] : []))
-    : [];
+  const available = (h: { tool?: HostedSearchTool | HostedFetchTool }) =>
+    Boolean(h.tool && (h.tool.kind === "fetch" ? hostedFetch : hostedSearch));
+  const hosted = [...decodedTools.hosted.values()].flatMap((h) =>
+    available(h) && h.tool ? [h.tool] : [],
+  );
   const droppedHosted = [...decodedTools.hosted.values()]
-    .filter((h) => !hostedSearch || !h.tool)
+    .filter((h) => !available(h))
     .map((h) => h.type);
   if (droppedHosted.length) {
     opts.logger?.info(
-      `anthropic dropped server tools: ${[...new Set(droppedHosted)].join(", ")} (no web search engine is set; run Web Search and Fetch)`,
+      `anthropic dropped server tools: ${[...new Set(droppedHosted)].join(", ")} (configured provider does not support these tools; run Web Search and Fetch)`,
     );
   }
   if (

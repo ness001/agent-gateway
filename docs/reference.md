@@ -183,6 +183,11 @@ can search and then call a tool (for example write a file) in the same turn.
 | Tavily    | Needs a key                      | `/extract`                            | Needs a key          | `Authorization: Bearer` |
 | Jina AI   | Needs a key                      | Reader `r.jina.ai`                    | Works (rate-limited) | `Authorization: Bearer` |
 | You.com   | Needs a key                      | `/v1/contents`                        | Needs a key          | `X-API-Key`             |
+| Brave Search | Needs a key | Not supported | Not supported | `X-Subscription-Token` |
+| Kagi | Needs a key | `/api/v1/extract` | Needs a key | `Authorization: Bearer` |
+
+Brave Search uses the [Web Search API](https://api-dashboard.search.brave.com/documentation/services/web-search) and does not support URL fetch. No other provider is contacted for fetches.
+Kagi uses the [v1 Search and Extract APIs](https://kagi.com/api/docs/openapi), not the deprecated v0 API. Both providers require their own API key and API access/billing.
 
 Anonymous availability was checked in October 2026 and can change at the
 provider's discretion.
