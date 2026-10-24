@@ -148,7 +148,7 @@ export class Gateway implements vscode.Disposable {
         getHealth: () => this.health(),
         errorJournal: this.errorJournal,
         getWebSearchModel: () => this.readConfig().webSearch.model,
-        getModelAliases: () => this.readConfig().modelAliases,
+        getModelAliases: () => this.readConfig().modelMappings,
         getFallbackModel: () => this.readConfig().fallbackModel,
         logger,
       });

@@ -4,9 +4,9 @@ import * as vscode from "vscode";
 
 import {
   DEV_TUNNEL_DOCS_URL,
-  DEV_TUNNEL_TERMINAL_NAME,
   DevTunnelCli,
   DevTunnelError,
+  DevTunnelHost,
   clientSetupText,
   findDevTunnelCli,
 } from "../gateway/devTunnel";
@@ -110,14 +110,31 @@ export async function hiddenSetApiKey(
   }
 }
 
-function sharingTerminal(): vscode.Terminal | undefined {
-  return vscode.window.terminals.find(
-    (t) => t.name === DEV_TUNNEL_TERMINAL_NAME,
-  );
+let tunnelHost: DevTunnelHost | undefined;
+let startingShare: Promise<void> | undefined;
+
+function hostFor(context: vscode.ExtensionContext): DevTunnelHost {
+  if (!tunnelHost) {
+    tunnelHost = new DevTunnelHost(undefined, (exit) => {
+      logger.warn(
+        `Background dev tunnel host stopped (kind: ${exit.kind}, code: ${exit.code ?? "none"}, signal: ${exit.signal ?? "none"}).`,
+      );
+      void vscode.window.showWarningMessage(
+        "The background dev tunnel host stopped. Run 'Share Gateway via Dev Tunnel' to start it again.",
+      );
+    });
+    context.subscriptions.push(tunnelHost);
+  }
+  return tunnelHost;
 }
 
 function isSharing(): boolean {
-  return sharingTerminal() !== undefined;
+  return tunnelHost?.active === true;
+}
+
+export async function stopDevTunnelHosting(): Promise<void> {
+  tunnelHost?.dispose();
+  await tunnelHost?.stop();
 }
 
 export type ShareAction =
@@ -159,15 +176,21 @@ export async function shareViaDevTunnel(
   context: vscode.ExtensionContext,
   gw: Gateway,
 ): Promise<void> {
-  const terminal = sharingTerminal();
-  if (!terminal) {
-    return startSharing(context, gw);
+  if (startingShare && !isSharing()) {
+    return startingShare;
+  }
+  const host = hostFor(context);
+  if (!host.active) {
+    startingShare = startSharing(context, gw, host).finally(() => {
+      startingShare = undefined;
+    });
+    return startingShare;
   }
   const url = context.globalState.get<string>(TUNNEL_URL_STATE_KEY);
   const hasKey = Boolean(await context.secrets.get(LLM_API_KEY_SECRET_KEY));
   const picked = await vscode.window.showQuickPick(
     shareActionItems(url, hasKey),
-    { title: `Gateway shared via dev tunnel${url ? ` at ${url}` : ""}` },
+    { title: `Dev tunnel hosting in background${url ? `: ${url}` : ""}` },
   );
   switch (picked?.id) {
     case "copyUrl":
@@ -179,11 +202,18 @@ export async function shareViaDevTunnel(
       );
       return;
     case "stop":
-      terminal.dispose();
-      logger.info("Stopped sharing the gateway via dev tunnel.");
-      void vscode.window.showInformationMessage(
-        "Stopped sharing. The tunnel is kept and reused next time.",
-      );
+      try {
+        await host.stop();
+        logger.info("Stopped sharing the gateway via dev tunnel.");
+        void vscode.window.showInformationMessage(
+          "Stopped sharing. The tunnel is kept and reused next time.",
+        );
+      } catch {
+        logger.warn("The background dev tunnel host could not be stopped.");
+        void vscode.window.showErrorMessage(
+          "The background dev tunnel host could not be stopped. Reload VS Code and check the devtunnel process before removing the gateway API key.",
+        );
+      }
       return;
     case "setKey":
       return setGatewayApiKey(context);
@@ -215,6 +245,7 @@ function shellCommand(cliPath: string): string {
 async function startSharing(
   context: vscode.ExtensionContext,
   gw: Gateway,
+  host: DevTunnelHost,
 ): Promise<void> {
   const port = gw.port;
   if (port === undefined) {
@@ -294,29 +325,33 @@ async function startSharing(
     );
     await context.globalState.update(TUNNEL_ID_STATE_KEY, result.tunnelId);
     await context.globalState.update(TUNNEL_URL_STATE_KEY, result.url);
-    runInTerminal(
-      DEV_TUNNEL_TERMINAL_NAME,
-      `${shellCommand(cliPath)} host ${result.tunnelId}`,
-    );
+    await host.start(cliPath, result.tunnelId);
+    if (!host.active) {
+      return;
+    }
     logger.info(
-      `Hosting dev tunnel ${result.tunnelId} (${result.created ? "new" : "reused"}) for port ${port} at ${result.url} (URL source: ${result.urlSource}).`,
+      `Started background dev tunnel host (${result.created ? "new" : "reused"}) for port ${port} (URL source: ${result.urlSource}).`,
     );
     const note =
       result.urlSource === "derived"
-        ? " (fallback: derived URL, the CLI did not report one; verify it in the terminal output)"
+        ? " This is a derived URL; the CLI did not report one."
         : "";
-    const pick = await vscode.window.showInformationMessage(
-      `Gateway shared at ${result.url}${note}. Keep the '${DEV_TUNNEL_TERMINAL_NAME}' terminal running.`,
-      "Copy URL",
-      "Copy client setup",
-    );
-    if (pick === "Copy URL") {
-      await vscode.env.clipboard.writeText(result.url);
-    } else if (pick === "Copy client setup") {
-      await vscode.env.clipboard.writeText(
-        clientSetupText(os.hostname(), result.url),
-      );
-    }
+    void vscode.window
+      .showInformationMessage(
+        `Dev tunnel hosting started in the background. Tunnel URL: ${result.url}. Connection readiness is not yet verified.${note} Run this command again to stop sharing.`,
+        "Copy URL",
+        "Copy client setup",
+      )
+      .then((pick) => {
+        if (pick === "Copy URL") {
+          return vscode.env.clipboard.writeText(result.url);
+        } else if (pick === "Copy client setup") {
+          return vscode.env.clipboard.writeText(
+            clientSetupText(os.hostname(), result.url),
+          );
+        }
+        return undefined;
+      });
   } catch (error) {
     logger.error(`Share via dev tunnel failed: ${errorText(error)}`);
     void vscode.window

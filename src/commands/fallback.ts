@@ -39,7 +39,7 @@ export function fallbackModelItems(
       action: "initializeMappings",
       description: "Review suggestions for agent default models",
     },
-    ...Object.entries({ ...DEFAULT_CONFIG.modelAliases, ...aliases })
+    ...Object.entries({ ...DEFAULT_CONFIG.modelMappings, ...aliases })
       .sort(([a], [b]) => a.localeCompare(b))
       .map(
         ([source, target]): FallbackModelItem => ({
@@ -71,7 +71,7 @@ export async function setFallbackModel(
   const models = gw.nativeModels();
   const aliases = vscode.workspace
     .getConfiguration(CONFIG_SECTION)
-    .get<Record<string, string>>("modelAliases", {});
+    .get<Record<string, string>>("modelMappings", {});
   const h = gw.health();
   const picked = await vscode.window.showQuickPick(
     fallbackModelItems(

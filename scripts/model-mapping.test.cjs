@@ -110,7 +110,7 @@ test("saves reviewed new aliases, preserves disabled/existing values and fallbac
   reset();
   await initializeModelMappings(gw);
   assert.deepEqual(writes, [
-    ["modelAliases", { ...aliases, "claude-sonnet-5": "balanced" }, 1],
+    ["modelMappings", { ...aliases, "claude-sonnet-5": "balanced" }, 1],
   ]);
   assert.equal(picks[1][0].picked, false);
   assert.equal(prompts.length, 1);
@@ -168,7 +168,7 @@ test("fallback command dispatches AI option without writing fallbackModel", asyn
   try {
     await setFallbackModel(gw);
     assert.equal(writes.length, 1);
-    assert.equal(writes[0][0], "modelAliases");
+    assert.equal(writes[0][0], "modelMappings");
   } finally {
     vscode.window.showQuickPick = pick;
   }
@@ -182,7 +182,7 @@ test("explicit review selection may replace an existing disabled entry", async (
   try {
     await initializeModelMappings(gw);
     assert.deepEqual(writes[0], [
-      "modelAliases",
+      "modelMappings",
       {
         unrelated: "balanced",
         "claude-haiku-5.5": "fast",
@@ -229,12 +229,12 @@ test("normal fallback choice still writes only fallbackModel", async () => {
 test("default mapping IDs are present and empty in both settings definitions", () => {
   const pkg = require("../package.json");
   const declared =
-    pkg.contributes.configuration.properties["agentGateway.modelAliases"]
+    pkg.contributes.configuration.properties["agentGateway.modelMappings"]
       .default;
   const { DEFAULT_CONFIG } = require("../out/utils/config");
   for (const source of ["claude-haiku-5.5", "claude-sonnet-5"]) {
     assert.equal(declared[source], "");
-    assert.equal(DEFAULT_CONFIG.modelAliases[source], "");
+    assert.equal(DEFAULT_CONFIG.modelMappings[source], "");
   }
 });
 test("review displays and saves an empty suggestion without inventing a target", async () => {
@@ -273,7 +273,7 @@ test("fallback reopening lists saved and default mappings and edits without AI",
   try {
     await setFallbackModel(gw);
     assert.equal(writes.length, 1);
-    assert.equal(writes[0][0], "modelAliases");
+    assert.equal(writes[0][0], "modelMappings");
     assert.equal(writes[0][1]["claude-haiku-5.5"], "balanced");
     assert.equal(writes[0][1].custom, "balanced");
     assert.equal(prompts.length, 0);
@@ -301,7 +301,7 @@ for (const cancelled of [true, false]) {
         assert.equal(writes.length, 0);
       } else {
         assert.deepEqual(writes, [
-          ["modelAliases", { "claude-haiku-5.5": "", custom: "balanced" }, 2],
+          ["modelMappings", { "claude-haiku-5.5": "", custom: "balanced" }, 2],
         ]);
       }
     } finally {

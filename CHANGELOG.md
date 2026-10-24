@@ -6,6 +6,15 @@
   selected automatically; **No fallback** disables fallback. Unknown model names
   use only the selected model. Existing model errors do not trigger fallback.
 - Allow slow first output without treating it as an actual request timeout.
+- Automatically configure Gemini CLI with a gateway endpoint, key and model,
+  with backups and reversible settings changes.
+- Identify forwarded requests with `[remote][upstream-name]` and show safe
+  generation settings alongside local request logs.
+- Host dev tunnels in an extension-managed background process instead of an
+  integrated terminal; stop hosting through **Stop sharing**.
+- Copy API URLs, including token-count endpoints, directly from **Status**.
+- Rename the model mapping setting to `agentGateway.modelMappings`. Rename any
+  existing `agentGateway.modelAliases` setting to keep your mappings.
 
 ## 0.1.2
 

@@ -173,6 +173,227 @@ suite("Gateway app", () => {
     assert.strictEqual(JSON.parse(h.remote[0].body!).model, "gpt-5-remote");
   });
 
+  test("remote settings cover all inference protocols without changing passthrough", async () => {
+    const cases = [
+      {
+        path: "/v1/messages",
+        protocol: "anthropic",
+        body: {
+          max_tokens: 4096,
+          top_p: 0.8,
+          stop_sequences: ["SECRET STOP"],
+          output_config: { effort: "high" },
+          tools: [
+            { name: "SECRET TOOL", input_schema: {} },
+            { type: "web_search_20250305" },
+          ],
+          tool_choice: {
+            type: "tool",
+            name: "SECRET TOOL",
+            disable_parallel_tool_use: true,
+          },
+        },
+        expected: [
+          "max_tokens=4096",
+          "top_p=0.8",
+          "stop=1",
+          "reasoning=high",
+          "tools=1",
+          "tool_choice=required",
+          "hosted=web_search_20250305",
+          "parallel_tool_calls=false",
+        ],
+      },
+      {
+        path: "/v1/chat/completions",
+        protocol: "openai-chat",
+        body: {
+          max_completion_tokens: 2048,
+          stop: "SECRET STOP",
+          reasoning_effort: "medium",
+          tools: [{ type: "function", function: { name: "SECRET TOOL" } }],
+          tool_choice: { type: "function", function: { name: "SECRET TOOL" } },
+          parallel_tool_calls: true,
+          prompt_cache_key: "SECRET CACHE",
+        },
+        expected: [
+          "max_tokens=2048",
+          "stop=1",
+          "reasoning=medium",
+          "tools=1",
+          "tool_choice=required",
+          "parallel_tool_calls=true",
+          "cache_key=yes",
+        ],
+      },
+      {
+        path: "/v1/responses",
+        protocol: "openai-responses",
+        body: {
+          max_output_tokens: 1024,
+          reasoning: { effort: "low" },
+          tools: [{ type: "web_search_preview" }],
+          tool_choice: "required",
+          prompt_cache_key: "SECRET CACHE",
+        },
+        expected: [
+          "max_tokens=1024",
+          "reasoning=low",
+          "tools=0",
+          "tool_choice=required",
+          "hosted=web_search_preview",
+          "cache_key=yes",
+        ],
+      },
+      {
+        path: "/v1beta/models/box--gpt-5-remote:streamGenerateContent",
+        protocol: "gemini",
+        body: {
+          generationConfig: {
+            maxOutputTokens: 512,
+            topP: 0.9,
+            temperature: 0.2,
+            stopSequences: ["SECRET STOP"],
+            thinkingConfig: { thinkingLevel: "HIGH" },
+          },
+          tools: [
+            { functionDeclarations: [{ name: "SECRET TOOL" }] },
+            { googleSearch: {} },
+            { urlContext: {} },
+          ],
+          toolConfig: { functionCallingConfig: { mode: "ANY" } },
+          cachedContent: "SECRET CACHE",
+          stream: false,
+        },
+        expected: [
+          "max_tokens=512",
+          "top_p=0.9",
+          "temperature=0.2",
+          "stop=1",
+          "reasoning=high",
+          "tools=1",
+          "tool_choice=required",
+          "hosted=googleSearch,urlContext",
+          "cache_key=yes",
+        ],
+      },
+    ];
+    for (const c of cases) {
+      const h = harness();
+      const body = {
+        model: "box--gpt-5-remote",
+        temperature: 0.4,
+        stream: true,
+        messages: [{ role: "user", content: "SECRET PROMPT" }],
+        future_extension: { type: "SECRET UNKNOWN", arguments: "SECRET ARGS" },
+        ...c.body,
+      };
+      const res = await createGatewayApp(h.deps).fetch(
+        post(c.path, body, { authorization: "Bearer SECRET KEY" }),
+      );
+      assert.strictEqual(res.status, 200, c.protocol);
+      assert.deepStrictEqual(
+        JSON.parse(h.remote[0].body!),
+        c.protocol === "gemini" ? body : { ...body, model: "gpt-5-remote" },
+      );
+      const lines = h.logs.filter((line) => line.includes(" settings "));
+      assert.strictEqual(lines.length, 1, c.protocol);
+      const line = lines[0];
+      for (const field of [
+        `${c.protocol} settings`,
+        'model="box--gpt-5-remote"',
+        'resolved="gpt-5-remote"',
+        "[remote][box]",
+        "forwarded=true",
+        "stream=true",
+        ...c.expected,
+      ]) {
+        assert.ok(line.includes(field), `${field}: ${line}`);
+      }
+      assert.ok(!line.includes("ignored"));
+      assert.ok(!h.logs.join("\n").includes("SECRET"));
+      assert.ok(
+        h.logs.some(
+          (line) =>
+            line.startsWith("[remote][box] ") && line.includes("status=200"),
+        ),
+      );
+    }
+  });
+
+  test("remote summaries identify failed routes and upstream errors", async () => {
+    for (const mode of ["missing", "unsupported", "http", "network"]) {
+      const h = harness();
+      if (mode === "missing") {
+        h.deps.getRemote = () => undefined;
+      } else if (mode === "unsupported") {
+        const entries = h.deps
+          .getRegistry()
+          .map((entry) => ({ ...entry, operations: [] }));
+        h.deps.getRegistry = () => entries;
+      } else {
+        h.deps.fetchImpl = (async () => {
+          if (mode === "network") {
+            throw new TypeError("SECRET NETWORK");
+          }
+          return new Response("SECRET UPSTREAM", { status: 429 });
+        }) as typeof fetch;
+      }
+      const res = await createGatewayApp(h.deps).fetch(
+        post("/v1/responses", { model: "box--gpt-5-remote" }),
+      );
+      assert.ok(res.status >= 400, mode);
+      assert.ok(
+        h.logs.some(
+          (line) =>
+            line.startsWith("[remote][box] ") &&
+            line.includes(`status=${res.status}`),
+        ),
+        h.logs.join("\n"),
+      );
+      assert.ok(!h.logs.join("\n").includes("SECRET"));
+    }
+  });
+
+  test("remote metadata skips token counting and uses Gemini action for streaming", async () => {
+    for (const path of [
+      "/v1/messages/count_tokens",
+      "/v1beta/models/box--gpt-5-remote:countTokens",
+      "/v1beta/models/box--gpt-5-remote:generateContent",
+    ]) {
+      const h = harness();
+      const res = await createGatewayApp(h.deps).fetch(
+        post(path, { model: "box--gpt-5-remote", stream: true }),
+      );
+      assert.strictEqual(res.status, 200);
+      const lines = h.logs.filter((line) => line.includes(" settings "));
+      if (path.endsWith("generateContent")) {
+        assert.strictEqual(lines.length, 1);
+        assert.ok(lines[0].includes("stream=false"));
+      } else {
+        assert.strictEqual(lines.length, 0);
+      }
+    }
+  });
+
+  test("a settings logger failure cannot reject remote forwarding", async () => {
+    const h = harness();
+    h.deps.logger.info = (line) => {
+      if (line.includes(" settings ")) {
+        throw new Error("logger unavailable");
+      }
+    };
+    const res = await createGatewayApp(h.deps).fetch(
+      post("/v1/responses", {
+        model: "box--gpt-5-remote",
+        tools: "future shape",
+        reasoning: false,
+      }),
+    );
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(h.remote.length, 1);
+  });
+
   test("aliases rewrite to the local upstream ID", async () => {
     const h = harness();
     const app = createGatewayApp(h.deps);
