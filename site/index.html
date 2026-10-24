@@ -1,0 +1,2271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f3ec" />
+    <meta
+      name="description"
+      content="A local bridge from your available GitHub Copilot models to the coding agents you choose. An MIT open-source extension for VS Code."
+    />
+    <title>
+      Agent Gateway — Your Copilot models. Your favorite coding agents.
+    </title>
+    <link rel="icon" type="image/png" href="icon.png" />
+    <meta
+      property="og:title"
+      content="Agent Gateway — Your Copilot models. Your favorite coding agents."
+    />
+    <meta
+      property="og:description"
+      content="Use your GitHub Copilot models in Claude Code, Codex, Gemini CLI and more. One gateway inside VS Code."
+    />
+    <meta property="og:type" content="website" />
+    <style>
+      :root {
+        --paper: #f5f3ec;
+        --ink: #252924;
+        --muted: #686b62;
+        --line: #d9dad0;
+        --orange: #bf4a28;
+        --blue: #344ed1;
+        --mono:
+          ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --sans:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        --serif:
+          Iowan Old Style, Baskerville, "Palatino Linotype", Palatino, Georgia,
+          serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 30px;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+      a:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 6px;
+      }
+      ::selection {
+        background: #e2e5fd;
+      }
+      .wrap {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 0 64px;
+      }
+      .mono {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      .header {
+        height: 105px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        gap: 28px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 650;
+        font-size: 18px;
+        letter-spacing: -0.6px;
+      }
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 29px;
+        height: 29px;
+        background: var(--orange);
+        color: var(--paper);
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 400;
+        letter-spacing: -4px;
+        padding-right: 4px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        font-size: 13px;
+      }
+      .nav a:hover,
+      .footer a:hover {
+        text-decoration: underline;
+        text-underline-offset: 5px;
+      }
+      .nav .nav-github {
+        border-left: 1px solid var(--line);
+        padding-left: 30px;
+      }
+      .arrow {
+        display: inline-block;
+        margin-left: 9px;
+      }
+      .hero {
+        padding: 73px 0 69px;
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+      }
+      .dot {
+        height: 6px;
+        width: 6px;
+        background: var(--orange);
+        border-radius: 50%;
+      }
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 1fr;
+        gap: 38px;
+        align-items: center;
+        margin-top: 30px;
+      }
+      h1 {
+        font-family: var(--serif);
+        font-size: clamp(64px, 6.7vw, 94px);
+        font-weight: 400;
+        line-height: 1.015;
+        letter-spacing: -5px;
+        margin: 0 0 28px;
+      }
+      h1 em {
+        font-weight: 400;
+        color: var(--orange);
+      }
+      .hero-copy {
+        max-width: 420px;
+        color: #5b6057;
+        font-size: 17px;
+        line-height: 1.75;
+        margin: 0 0 30px;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        flex-wrap: wrap;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ink);
+        color: #fffdf7;
+        padding: 17px 21px;
+        font-size: 13px;
+        font-weight: 550;
+        transition:
+          background 0.2s,
+          transform 0.2s;
+      }
+      .button:hover {
+        background: var(--orange);
+        transform: translateY(-2px);
+      }
+      .text-link {
+        font-size: 13px;
+        border-bottom: 1px solid #a4a79b;
+        padding-bottom: 4px;
+      }
+      .text-link:hover {
+        color: var(--orange);
+        border-color: var(--orange);
+      }
+      .hero-note {
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.8;
+        color: var(--muted);
+        margin-top: 19px;
+      }
+      .visual {
+        position: relative;
+        padding: 20px 0 12px;
+      }
+      .visual-top {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        margin-bottom: 16px;
+        color: var(--muted);
+      }
+      .visual-top span:first-child {
+        color: var(--orange);
+      }
+      .terminal {
+        background: #252c28;
+        color: #e9ece3;
+        border-radius: 5px;
+        overflow: hidden;
+        box-shadow: 0 14px 35px -24px #20291e70;
+      }
+      .terminal-bar {
+        padding: 17px 20px;
+        border-bottom: 1px solid #ffffff16;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #a5b0a2;
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .window-dots {
+        display: flex;
+        gap: 5px;
+      }
+      .window-dots i {
+        width: 5px;
+        height: 5px;
+        background: #738071;
+        border-radius: 50%;
+      }
+      .terminal-content {
+        padding: 29px 25px 30px;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.9;
+        overflow: auto;
+      }
+      .terminal-line {
+        white-space: nowrap;
+      }
+      .terminal-comment {
+        color: #98a594;
+      }
+      .terminal-prompt {
+        color: #e99973;
+      }
+      .terminal-command {
+        margin: 0 0 22px;
+      }
+      .terminal-ok {
+        color: #a8cba1;
+      }
+      .terminal-row {
+        display: flex;
+        gap: 15px;
+        padding: 3px 0;
+      }
+      .terminal-row .key {
+        color: #b2bdb0;
+        min-width: 72px;
+      }
+      .terminal-row .value {
+        color: #e7eadd;
+      }
+      .terminal-rule {
+        border: 0;
+        border-top: 1px solid #ffffff15;
+        margin: 22px 0 18px;
+      }
+      .terminal-cursor {
+        display: inline-block;
+        width: 7px;
+        height: 13px;
+        background: #d7e1cf;
+        vertical-align: -2px;
+        margin-left: 5px;
+      }
+      .visual-bottom {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 19px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.6;
+      }
+      .local-icon {
+        width: 13px;
+        height: 10px;
+        border: 1px solid #93998c;
+        display: inline-block;
+        position: relative;
+      }
+      .local-icon:after {
+        content: "";
+        position: absolute;
+        width: 5px;
+        border-top: 1px solid #93998c;
+        bottom: -4px;
+        left: 3px;
+      }
+      .compatibility {
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: 1fr 2.1fr;
+        gap: 28px;
+        align-items: center;
+        padding: 27px 0;
+      }
+      .compatibility .mono {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.7;
+      }
+      .agent-list {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        font-size: 16px;
+        font-weight: 550;
+        letter-spacing: -0.4px;
+      }
+      .agent-list span:last-child {
+        font-family: var(--serif);
+        font-size: 19px;
+        font-style: italic;
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .features {
+        padding: 90px 0 84px;
+      }
+      .section-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 35px;
+        margin-bottom: 46px;
+      }
+      .section-label {
+        color: var(--orange);
+        padding-top: 9px;
+        white-space: nowrap;
+      }
+      h2 {
+        font-family: var(--serif);
+        font-size: 43px;
+        line-height: 1.13;
+        font-weight: 400;
+        letter-spacing: -1.5px;
+        margin: 0;
+        max-width: 560px;
+      }
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 38px;
+      }
+      .feature {
+        border-top: 1px solid var(--ink);
+        padding-top: 21px;
+      }
+      .feature-number {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--orange);
+      }
+      h3 {
+        font-size: 17px;
+        font-weight: 550;
+        letter-spacing: -0.3px;
+        margin: 30px 0 12px;
+      }
+      .feature p {
+        font-size: 14px;
+        line-height: 1.8;
+        color: var(--muted);
+        margin: 0;
+        max-width: 305px;
+      }
+      .feature-detail {
+        display: inline-block;
+        margin-top: 22px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--blue);
+        line-height: 1.8;
+      }
+      .setup {
+        background: #eaece3;
+        padding: 45px 42px 39px;
+        border: 1px solid #dce0d3;
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 55px;
+      }
+      .setup h2 {
+        font-size: 38px;
+        margin: 18px 0;
+      }
+      .setup-intro {
+        max-width: 290px;
+        font-size: 14px;
+        line-height: 1.75;
+        color: var(--muted);
+      }
+      .steps {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 15px;
+        padding: 17px 0;
+        border-bottom: 1px solid #d0d5c8;
+      }
+      .step:first-child {
+        padding-top: 1px;
+      }
+      .step:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+      .step-index {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--blue);
+        padding-top: 4px;
+      }
+      .step strong {
+        font-weight: 550;
+        font-size: 14px;
+      }
+      .step p {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--muted);
+        margin: 7px 0 0;
+      }
+      .setup-footnote {
+        grid-column: 1/-1;
+        padding-top: 20px;
+        border-top: 1px solid #d0d5c8;
+        margin-top: -23px;
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+      .closing {
+        padding: 79px 0 73px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 25px;
+      }
+      .closing h2 {
+        font-size: 38px;
+      }
+      .closing p {
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin: 12px 0 0;
+      }
+      .closing .button {
+        white-space: nowrap;
+      }
+      .footer {
+        border-top: 1px solid var(--line);
+        padding: 25px 0 29px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .footer-links {
+        display: flex;
+        gap: 22px;
+      }
+      .concept {
+        color: #85887e;
+      }
+      @media (min-width: 1500px) {
+        .hero {
+          padding-top: 95px;
+          padding-bottom: 85px;
+        }
+        .hero-grid {
+          gap: 65px;
+        }
+        .visual {
+          padding-top: 30px;
+        }
+      }
+      @media (max-width: 1000px) {
+        .wrap {
+          padding: 0 35px;
+        }
+        .hero-grid {
+          gap: 25px;
+          grid-template-columns: 1fr 1fr;
+        }
+        h1 {
+          font-size: 68px;
+          letter-spacing: -3.5px;
+        }
+        .hero-copy {
+          font-size: 15px;
+        }
+        .terminal-content {
+          font-size: 10px;
+          padding: 24px 18px;
+        }
+        .terminal-row {
+          gap: 8px;
+        }
+        .terminal-row .key {
+          min-width: 63px;
+        }
+        .feature-grid {
+          gap: 24px;
+        }
+        .setup {
+          padding: 35px 30px;
+          gap: 30px;
+        }
+        .agent-list {
+          font-size: 14px;
+          flex-wrap: wrap;
+        }
+        .compatibility {
+          grid-template-columns: 1fr 2.5fr;
+        }
+        .section-heading h2 {
+          font-size: 38px;
+        }
+      }
+      @media (max-width: 720px) {
+        .wrap {
+          padding: 0 23px;
+        }
+        .header {
+          height: 82px;
+        }
+        .brand {
+          font-size: 16px;
+        }
+        .nav {
+          gap: 18px;
+        }
+        .nav a:not(.nav-github) {
+          display: none;
+        }
+        .nav .nav-github {
+          border: 0;
+          padding: 0;
+        }
+        .hero {
+          padding: 43px 0;
+        }
+        .eyebrow {
+          font-size: 9px;
+        }
+        .hero-grid {
+          grid-template-columns: 1fr;
+          gap: 35px;
+          margin-top: 25px;
+        }
+        h1 {
+          font-size: 76px;
+          letter-spacing: -4px;
+          margin-bottom: 23px;
+        }
+        .hero-copy {
+          font-size: 16px;
+          max-width: 420px;
+        }
+        .actions {
+          gap: 22px;
+        }
+        .visual {
+          max-width: 500px;
+          width: 100%;
+          padding: 0;
+        }
+        .terminal-content {
+          font-size: 12px;
+          padding: 25px;
+        }
+        .compatibility {
+          grid-template-columns: 1fr;
+          gap: 18px;
+          padding: 24px 0;
+        }
+        .agent-list {
+          justify-content: flex-start;
+          gap: 22px;
+          font-size: 15px;
+        }
+        .features {
+          padding: 53px 0;
+        }
+        .section-heading {
+          display: block;
+          margin-bottom: 31px;
+        }
+        .section-label {
+          margin-bottom: 17px;
+        }
+        .section-heading h2 {
+          font-size: 37px;
+        }
+        .feature-grid {
+          grid-template-columns: 1fr;
+          gap: 29px;
+        }
+        .feature {
+          display: grid;
+          grid-template-columns: 27px 1fr;
+          column-gap: 12px;
+          padding-top: 19px;
+        }
+        .feature-number {
+          padding-top: 3px;
+        }
+        .feature h3 {
+          margin: 0 0 9px;
+        }
+        .feature p,
+        .feature-detail {
+          grid-column: 2;
+        }
+        .feature p {
+          max-width: 440px;
+        }
+        .feature-detail {
+          margin-top: 13px;
+        }
+        .setup {
+          grid-template-columns: 1fr;
+          padding: 28px 23px;
+          gap: 26px;
+        }
+        .setup h2 {
+          font-size: 35px;
+        }
+        .setup-intro {
+          max-width: 100%;
+          margin-bottom: 0;
+        }
+        .setup-footnote {
+          margin-top: 0;
+          padding-top: 17px;
+        }
+        .closing {
+          padding: 51px 0;
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .closing h2 {
+          font-size: 35px;
+        }
+        .footer {
+          align-items: flex-start;
+          flex-wrap: wrap;
+          line-height: 1.8;
+        }
+        .footer-links {
+          gap: 17px;
+        }
+        .concept {
+          width: 100%;
+          font-size: 9px;
+        }
+      }
+      @media (max-width: 380px) {
+        h1 {
+          font-size: 65px;
+        }
+        .terminal-content {
+          padding: 21px 17px;
+          font-size: 10px;
+        }
+        .agent-list {
+          gap: 17px;
+        }
+        .button {
+          padding: 16px;
+        }
+        .actions {
+          gap: 17px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        .button {
+          transition: none;
+        }
+        .button:hover {
+          transform: none;
+        }
+      }
+      .feature-story {
+        display: grid;
+        grid-template-columns: 0.88fr 1.12fr;
+        gap: 70px;
+        align-items: center;
+        padding: 66px 0;
+        border-top: 1px solid var(--line);
+      }
+      .feature-story.reverse {
+        grid-template-columns: 1.12fr 0.88fr;
+      }
+      .feature-story.reverse .story-copy {
+        order: 2;
+      }
+      .feature-story.reverse .story-visual {
+        order: 1;
+      }
+      .story-copy .mono {
+        color: var(--orange);
+        margin-bottom: 20px;
+      }
+      .story-copy h2 {
+        font-size: 43px;
+        line-height: 1.13;
+        margin-bottom: 22px;
+      }
+      .story-copy p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.85;
+        margin: 0 0 18px;
+      }
+      .story-copy strong {
+        color: var(--ink);
+        font-weight: 550;
+      }
+      .story-copy .detail {
+        font-size: 12px;
+        line-height: 1.8;
+        border-left: 2px solid var(--orange);
+        padding-left: 16px;
+        margin-top: 24px;
+      }
+      .story-copy a {
+        color: var(--blue);
+        text-decoration: underline;
+        text-underline-offset: 4px;
+        font-size: 12px;
+      }
+      .story-visual {
+        min-width: 0;
+        margin: 0;
+      }
+      .mock-panel {
+        background: #fdfcf7;
+        border: 1px solid #d5d8cc;
+        border-radius: 5px;
+        box-shadow: 0 14px 38px -30px #26382180;
+        overflow: hidden;
+      }
+      .mock-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid #e2e3db;
+        padding: 15px 19px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .mock-header .mono {
+        font-size: 9px;
+        color: var(--muted);
+        letter-spacing: 0.03em;
+      }
+      .mock-body {
+        padding: 23px;
+      }
+      .mock-label {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        line-height: 1.7;
+        margin-bottom: 12px;
+      }
+      .choice-row {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 11px 0;
+        border-bottom: 1px solid #e9eae1;
+      }
+      .choice-row small {
+        margin-left: auto;
+        font-family: var(--mono);
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .check {
+        display: grid;
+        place-items: center;
+        background: #e4e8fa;
+        border: 1px solid #a5afe7;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        color: #344abc;
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+      .check.empty {
+        background: transparent;
+        border-color: #c2c7b8;
+      }
+      .review {
+        margin-top: 20px;
+        border: 1px solid #d7ddce;
+        background: #f1f3eb;
+        padding: 15px;
+        font-size: 11px;
+        line-height: 1.8;
+        color: #5a6454;
+      }
+      .review strong {
+        display: block;
+        color: #303c2a;
+        font-weight: 550;
+        margin-bottom: 4px;
+      }
+      .review code {
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .mock-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border-top: 1px solid #e2e3db;
+        padding: 14px 19px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .mock-action {
+        padding: 8px 11px;
+        background: #30382d;
+        color: white;
+        border-radius: 2px;
+        font-size: 10px;
+      }
+      .story-visual figcaption {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 9px;
+        line-height: 1.7;
+        margin-top: 14px;
+        letter-spacing: 0.015em;
+      }
+      .device-stage {
+        background: #eceee5;
+        padding: 27px;
+        border: 1px solid #d6dbcd;
+        border-radius: 5px;
+      }
+      .device {
+        border: 1px solid #9ea695;
+        border-radius: 6px;
+        background: #fdfcf8;
+        overflow: hidden;
+      }
+      .device-title {
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 11px 15px;
+        border-bottom: 1px solid #dfe3d6;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .device-content {
+        padding: 19px;
+        font-size: 13px;
+      }
+      .device-content strong {
+        display: block;
+        font-weight: 550;
+        margin-bottom: 7px;
+      }
+      .device-content p {
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.7;
+        margin: 0;
+      }
+      .connection {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 18px 0;
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--blue);
+        text-align: center;
+        line-height: 1.7;
+      }
+      .connection:before,
+      .connection:after {
+        content: "";
+        height: 1px;
+        background: #aab3db;
+        flex: 1;
+      }
+      .device-foot {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding-top: 18px;
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .provider-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 20px;
+      }
+      .provider {
+        border: 1px solid #d2d6ca;
+        border-radius: 3px;
+        padding: 8px 11px;
+        background: transparent;
+        color: #59614e;
+        font-family: var(--sans);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .provider[aria-pressed="true"] {
+        background: #e9ecff;
+        border-color: #8d9be6;
+        color: #2e43b4;
+      }
+      .provider:hover {
+        border-color: var(--blue);
+      }
+      .provider-note {
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--muted);
+        min-height: 42px;
+      }
+      .source-card {
+        border: 1px solid #dfe2d5;
+        border-left: 2px solid var(--orange);
+        background: #f7f7ef;
+        margin-top: 12px;
+        padding: 13px 15px;
+      }
+      .source-card .source-type {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .source-card strong {
+        display: block;
+        font-weight: 550;
+        font-size: 12px;
+        margin-top: 7px;
+      }
+      .source-card p {
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--muted);
+        margin: 6px 0 0;
+      }
+      .route {
+        border: 1px solid #dfe2d6;
+        padding: 15px;
+        margin-top: 12px;
+      }
+      .route .route-title {
+        font-size: 11px;
+        font-weight: 550;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .route .route-title span {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--blue);
+        font-weight: 400;
+      }
+      .route-flow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 11px;
+        margin-top: 12px;
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.7;
+        overflow-wrap: anywhere;
+      }
+      .route-flow .to {
+        color: var(--orange);
+        font-size: 17px;
+      }
+      .route p {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.7;
+        margin: 10px 0 0;
+      }
+      .badge {
+        border: 1px solid #ccd3c2;
+        background: #eff2e7;
+        color: #4a5c3b;
+        font-size: 9px;
+        padding: 4px 7px;
+        white-space: nowrap;
+      }
+      .route-notice {
+        margin-top: 17px;
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.9;
+        color: var(--muted);
+      }
+      .api-list {
+        display: grid;
+        gap: 9px;
+      }
+      .api-row {
+        background: #f3f4eb;
+        border: 1px solid #e0e3d6;
+        padding: 10px 12px;
+        min-width: 0;
+      }
+      .api-row-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 10px;
+        margin-bottom: 7px;
+      }
+      .api-row code {
+        font-family: var(--mono);
+        font-size: 9px;
+        line-height: 1.7;
+        display: block;
+        overflow-wrap: anywhere;
+        color: #58694c;
+      }
+      .copy-btn {
+        border: 0;
+        background: none;
+        color: var(--blue);
+        font-family: var(--mono);
+        font-size: 9px;
+        cursor: pointer;
+        padding: 4px 0;
+      }
+      .copy-btn:hover {
+        text-decoration: underline;
+      }
+      .safe-log {
+        margin: 17px 0 0;
+        background: #283128;
+        color: #c4d4bb;
+        font-family: var(--mono);
+        font-size: 9px;
+        line-height: 1.9;
+        padding: 15px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .safe-log-label {
+        color: #93a88b;
+      }
+      .agent-section {
+        padding: 34px 0 68px;
+      }
+      .agents-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 22px;
+      }
+      .agents-head h2 {
+        font-size: 31px;
+      }
+      .agent-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        margin: 24px 0 16px;
+      }
+      .agent-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid #d5d8cc;
+        padding: 10px 13px;
+        font-size: 12px;
+      }
+      .agent-icon {
+        display: block;
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        object-fit: contain;
+      }
+      .agent-chip small {
+        display: inline-block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-left: 7px;
+      }
+      .agent-footnote {
+        font-size: 12px;
+        line-height: 1.8;
+        color: var(--muted);
+        max-width: 790px;
+      }
+      .agent-footnote a {
+        color: var(--blue);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .command-section {
+        display: grid;
+        grid-template-columns: 0.7fr 1.3fr;
+        align-items: center;
+        gap: 48px;
+        padding: 56px 0;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 65px;
+      }
+      .command-section h2 {
+        font-size: 34px;
+        margin: 15px 0;
+      }
+      .command-section p {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .command-section img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid #d6d8cf;
+        border-radius: 5px;
+      }
+      .command-section figure {
+        margin: 0;
+      }
+      .command-section figcaption {
+        font-family: var(--mono);
+        font-size: 9px;
+        line-height: 1.7;
+        color: var(--muted);
+        margin-top: 12px;
+      }
+      .faq {
+        padding: 65px 0 0;
+      }
+      .faq-head {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: 65px;
+      }
+      .faq h2 {
+        font-size: 38px;
+        margin-top: 17px;
+      }
+      .faq details {
+        border-bottom: 1px solid var(--line);
+        padding: 20px 0;
+      }
+      .faq details:first-child {
+        padding-top: 0;
+      }
+      .faq summary {
+        font-size: 14px;
+        cursor: pointer;
+        line-height: 1.7;
+        list-style: none;
+        position: relative;
+        padding-right: 24px;
+      }
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+      .faq summary:after {
+        content: "+";
+        position: absolute;
+        right: 0;
+        color: var(--orange);
+        font-family: var(--mono);
+      }
+      .faq details[open] summary:after {
+        content: "−";
+      }
+      .faq details p {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.9;
+        margin: 13px 0 0;
+      }
+      .faq details a {
+        color: var(--blue);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+      kbd {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 10px;
+        background: #ebece4;
+        border: 1px solid #cfd2c6;
+        padding: 2px 5px;
+        border-radius: 3px;
+      }
+      .section-intro {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 40px;
+        margin-bottom: 42px;
+      }
+      .section-intro p {
+        max-width: 380px;
+        font-size: 14px;
+        line-height: 1.9;
+        color: var(--muted);
+        margin: 0;
+      }
+      .features {
+        padding-bottom: 15px;
+      }
+      .copy-status {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+        min-height: 16px;
+        margin: 14px 0 0;
+      }
+      @media (max-width: 1000px) {
+        .feature-story,
+        .feature-story.reverse {
+          gap: 35px;
+          grid-template-columns: 1fr 1fr;
+        }
+        .story-copy h2 {
+          font-size: 35px;
+        }
+        .story-copy p {
+          font-size: 14px;
+        }
+        .mock-body {
+          padding: 18px;
+        }
+        .device-stage {
+          padding: 20px;
+        }
+        .command-section {
+          gap: 30px;
+        }
+        .faq-head {
+          gap: 35px;
+        }
+        .section-intro {
+          gap: 30px;
+        }
+        .section-intro h2 {
+          font-size: 37px;
+        }
+        .section-intro p {
+          max-width: 300px;
+        }
+      }
+      @media (max-width: 720px) {
+        .feature-story,
+        .feature-story.reverse {
+          grid-template-columns: 1fr;
+          gap: 27px;
+          padding: 43px 0;
+        }
+        .feature-story.reverse .story-copy,
+        .feature-story.reverse .story-visual {
+          order: initial;
+        }
+        .story-copy .mono {
+          margin-bottom: 15px;
+        }
+        .story-copy h2 {
+          font-size: 38px;
+          margin-bottom: 17px;
+          max-width: 430px;
+        }
+        .story-copy p {
+          font-size: 14px;
+        }
+        .story-copy .detail {
+          margin-top: 18px;
+        }
+        .story-visual {
+          max-width: 560px;
+          width: 100%;
+        }
+        .section-intro {
+          display: block;
+        }
+        .section-intro h2 {
+          font-size: 38px;
+          margin-bottom: 20px;
+        }
+        .section-intro p {
+          max-width: 100%;
+        }
+        .agents-head {
+          display: block;
+        }
+        .agents-head .mono {
+          margin-top: 15px;
+        }
+        .agent-section {
+          padding: 25px 0 44px;
+        }
+        .agent-chip {
+          font-size: 11px;
+          padding: 9px 11px;
+        }
+        .agent-chips {
+          gap: 7px;
+        }
+        .command-section {
+          grid-template-columns: 1fr;
+          gap: 19px;
+          padding: 35px 0;
+          margin-bottom: 43px;
+        }
+        .command-section p {
+          margin-bottom: 0;
+        }
+        .faq {
+          padding-top: 44px;
+        }
+        .faq-head {
+          grid-template-columns: 1fr;
+          gap: 30px;
+        }
+        .faq h2 {
+          font-size: 35px;
+        }
+        .api-row code {
+          font-size: 9px;
+        }
+        .copy-status {
+          font-size: 9px;
+        }
+        .mock-header {
+          padding: 15px;
+        }
+        .visual-top {
+          font-size: 9px;
+        }
+        .terminal-bar {
+          font-size: 9px;
+        }
+        .mock-label {
+          font-size: 9px;
+        }
+        .mock-footer {
+          flex-wrap: wrap;
+        }
+        .feature-story:last-child {
+          padding-bottom: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="header">
+        <a href="#" class="brand" aria-label="Agent Gateway home"
+          ><img
+            src="icon.png"
+            width="34"
+            height="34"
+            alt=""
+            style="object-fit: contain"
+          />Agent Gateway</a
+        >
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#possibilities">Overview</a>
+          <a href="#setup">Get started</a>
+          <a
+            class="nav-github"
+            href="https://github.com/ness001/agent-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub <span class="arrow" aria-hidden="true">↗</span></a
+          >
+        </nav>
+      </header>
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="eyebrow mono">
+            <span class="dot" aria-hidden="true"></span> GitHub Copilot, beyond
+            the editor
+          </div>
+          <div class="hero-grid">
+            <div>
+              <h1
+                id="hero-title"
+                style="
+                  font-size: clamp(44px, 5.2vw, 72px);
+                  letter-spacing: -0.045em;
+                  line-height: 1.08;
+                "
+              >
+                Your <em>Copilot</em> models.<br />Your favorite coding agents.
+              </h1>
+              <p class="hero-copy">
+                Bring the models available in GitHub Copilot to Claude Code,
+                Codex, Gemini CLI and more—through one gateway inside VS Code.
+              </p>
+              <div class="actions">
+                <a
+                  class="button"
+                  href="https://marketplace.visualstudio.com/items?itemName=ness001.agent-gateway"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Install for VS Code
+                  <span class="arrow" aria-hidden="true">↗</span></a
+                >
+                <a
+                  class="text-link"
+                  href="https://github.com/ness001/agent-gateway"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Explore the source
+                  <span class="arrow" aria-hidden="true">↗</span></a
+                >
+              </div>
+              <p class="hero-note">
+                MIT licensed · Requires signed-in GitHub Copilot Chat.<br />Keep
+                VS Code open. Your account’s model access and quotas apply.
+              </p>
+            </div>
+            <div
+              class="visual"
+              aria-label="Illustrative terminal showing coding agents connected through Agent Gateway"
+            >
+              <div class="visual-top">
+                <span>ONE CONNECTION. MORE POSSIBILITIES.</span
+                ><span>01 / LOCAL</span>
+              </div>
+              <div class="terminal">
+                <div class="terminal-bar">
+                  <span class="window-dots" aria-hidden="true"
+                    ><i></i><i></i><i></i></span
+                  ><span>agent-gateway / illustrative session</span
+                  ><span aria-hidden="true">↗</span>
+                </div>
+                <div class="terminal-content">
+                  <div class="terminal-comment">
+                    # Your workspace. Your choice of agent.
+                  </div>
+                  <div class="terminal-command terminal-line">
+                    <span class="terminal-prompt">❯</span> claude
+                    <span class="terminal-comment">| codex | gemini</span>
+                  </div>
+                  <div class="terminal-row">
+                    <span class="key">Gateway</span
+                    ><span class="terminal-ok">● Local connection</span>
+                  </div>
+                  <div class="terminal-row">
+                    <span class="key">Provider</span
+                    ><span class="value">GitHub Copilot in VS Code</span>
+                  </div>
+                  <div class="terminal-row">
+                    <span class="key">APIs</span
+                    ><span class="value">OpenAI · Anthropic · Gemini</span>
+                  </div>
+                  <hr class="terminal-rule" />
+                  <div class="terminal-comment">
+                    Same models. A different way to build.
+                  </div>
+                  <div class="terminal-line">
+                    <span class="terminal-prompt">❯</span> What are we making
+                    today?<span
+                      class="terminal-cursor"
+                      aria-hidden="true"
+                    ></span>
+                  </div>
+                </div>
+              </div>
+              <div class="visual-bottom">
+                <span class="local-icon" aria-hidden="true"></span>Local bridge.
+                Upstream provider limits still apply.
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          class="agent-section"
+          id="agents"
+          aria-labelledby="agents-title"
+        >
+          <div class="agents-head">
+            <h2 id="agents-title">Supported coding agents.</h2>
+            <span class="mono" style="color: var(--muted)"
+              >Automatic setup, guided steps, or manual connection</span
+            >
+          </div>
+          <div class="agent-chips">
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/claude.ico"
+                width="22"
+                height="22"
+                alt=""
+              />Claude Code</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/codex.png"
+                width="22"
+                height="22"
+                alt=""
+              />Codex</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/gemini.png"
+                width="22"
+                height="22"
+                alt=""
+              />Gemini CLI</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/oh-my-pi.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Oh My Pi</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/pi.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Pi</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/hermes.png"
+                width="22"
+                height="22"
+                alt=""
+              />Hermes Agent</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/openclaw.svg"
+                width="22"
+                height="22"
+                alt=""
+              />OpenClaw</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/kilo.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Kilo Code</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/cline.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Cline CLI</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/deepseek-harness.svg"
+                width="22"
+                height="22"
+                alt=""
+              />DeepSeek Harness</span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/antigravity.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Antigravity CLI <small>Guided steps</small></span
+            >
+            <span class="agent-chip"
+              ><img
+                class="agent-icon"
+                src="agent-icons/cursor.svg"
+                width="22"
+                height="22"
+                alt=""
+              />Cursor <small>Manual · tunnel required</small></span
+            >
+          </div>
+          <p class="agent-footnote">
+            Setup and tool support vary. Gemini CLI and OpenClaw setup are not
+            yet verified with live installs. Cline’s VS Code extension requires
+            manual setup. Other compatible clients can connect using an OpenAI,
+            Anthropic, or Gemini base URL.
+            <a
+              href="https://github.com/ness001/agent-gateway#supported-agents"
+              target="_blank"
+              rel="noopener noreferrer"
+              >See agent-by-agent details ↗</a
+            >
+          </p>
+        </section>
+
+        <section
+          class="command-section"
+          id="setup"
+          aria-labelledby="commands-title"
+        >
+          <div>
+            <div class="mono section-label">Everything starts in VS Code</div>
+            <h2 id="commands-title">Set up your agents<br />from VS Code.</h2>
+            <p>
+              Open the Command Palette with <kbd>⇧⌘P</kbd> on macOS or
+              <kbd>Ctrl+Shift+P</kbd> on Windows and Linux. Type
+              <strong>Agent Gateway</strong> to find status, setup, sharing, and
+              search.
+            </p>
+            <div class="setup-steps">
+              <ol class="steps">
+                <li class="step">
+                  <span class="step-index">01</span>
+                  <div>
+                    <strong>Install and allow Copilot access</strong>
+                    <p>
+                      Install Agent Gateway from the Marketplace. When VS Code
+                      asks to let it use Copilot’s language models, choose
+                      <strong>Allow</strong>.
+                    </p>
+                  </div>
+                </li>
+                <li class="step">
+                  <span class="step-index">02</span>
+                  <div>
+                    <strong>Check that the gateway is ready</strong>
+                    <p>
+                      Click <strong>Gateway</strong> in the status bar or run
+                      <strong>Agent Gateway: Status</strong>. Confirm that it
+                      says <strong>Ready</strong>.
+                    </p>
+                  </div>
+                </li>
+                <li class="step">
+                  <span class="step-index">03</span>
+                  <div>
+                    <strong>Choose your agents and model</strong>
+                    <p>
+                      Run <strong>Configure Coding Agents</strong>, review
+                      changes, and confirm. Follow the remaining setup or
+                      restart instructions for each agent.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <p class="detail">
+              Configuration changes are reviewed before saving, backed up, and
+              reversible through <strong>Remove gateway</strong>.
+            </p>
+          </div>
+          <figure>
+            <img
+              src="command-palette.png"
+              width="630"
+              height="245"
+              alt="Actual VS Code Command Palette listing Agent Gateway commands: Status, Web Search and Fetch, Set Fallback Model, Configure Coding Agents, Manage Remote Upstreams, Change Port, Restart Gateway, and Share Gateway via Dev Tunnel."
+              loading="lazy"
+            />
+            <figcaption>
+              PRODUCT SCREENSHOT · Agent Gateway commands in the VS Code Command
+              Palette.
+            </figcaption>
+          </figure>
+        </section>
+        <section
+          class="features"
+          id="possibilities"
+          aria-labelledby="features-title"
+        >
+          <div class="section-intro">
+            <div>
+              <div class="section-label mono" style="margin-bottom: 18px">
+                01 — A closer look
+              </div>
+              <h2 id="features-title">
+                Your Copilot models.<br />More ways to use them.
+              </h2>
+            </div>
+            <p>
+              Keep the agent’s file edits, shell commands, and MCP tools. The
+              gateway handles the model connection, API translation, and the
+              settings in between.
+            </p>
+          </div>
+
+          <article class="feature-story reverse" aria-labelledby="remote-title">
+            <div class="story-copy">
+              <div class="mono">/ 01 &nbsp; Local or another machine</div>
+              <h2 id="remote-title">
+                Share Copilot models<br />across machines.
+              </h2>
+              <p>
+                Work through the local gateway, or bring models from another
+                machine into the same list. On the host, use
+                <strong>Share Gateway via Dev Tunnel</strong>. On the other
+                machine, add its URL and key in
+                <strong>Manage Remote Upstreams</strong>.
+              </p>
+              <p>
+                Tunnel hosting runs in an extension-managed background process,
+                not an integrated terminal. Use <strong>Stop sharing</strong> to
+                end it; extension shutdown also stops hosting.
+              </p>
+              <p class="detail">
+                Set a gateway API key before sharing. Anyone with the tunnel URL
+                and key can use the host’s models. Initial devtunnel
+                installation or sign-in may still need an interactive terminal.
+              </p>
+            </div>
+            <figure class="story-visual">
+              <div class="device-stage">
+                <div class="device">
+                  <div class="device-title">
+                    <span>HOST MACHINE</span><span>VS CODE OPEN</span>
+                  </div>
+                  <div class="device-content">
+                    <strong>Copilot + Agent Gateway</strong>
+                    <p>
+                      Local models remain available here.<br />Dev tunnel
+                      hosting runs in the background.
+                    </p>
+                  </div>
+                </div>
+                <div class="connection">
+                  AUTHENTICATED DEV TUNNEL<br />Gateway URL + separate API key
+                </div>
+                <div class="device">
+                  <div class="device-title">
+                    <span>OTHER MACHINE</span><span>REMOTE ADDED</span>
+                  </div>
+                  <div class="device-content">
+                    <strong>Your agent, with a wider model list</strong>
+                    <p>
+                      Remote names use
+                      <code>&lt;name&gt;--&lt;model&gt;</code>.<br />Choose a
+                      local or remote model for the task.
+                    </p>
+                  </div>
+                </div>
+                <div class="device-foot">
+                  <span class="dot" aria-hidden="true"></span>Stop sharing
+                  whenever you choose.
+                </div>
+              </div>
+              <figcaption>
+                CONCEPTUAL CONNECTION VIEW · Devices and connection are
+                illustrative; no live status is shown.
+              </figcaption>
+            </figure>
+          </article>
+
+          <article class="feature-story" aria-labelledby="web-title">
+            <div class="story-copy">
+              <div class="mono">/ 02 &nbsp; Search &amp; read the web</div>
+              <h2 id="web-title">Add web search<br />and page fetching.</h2>
+              <p>
+                Enable supported web search and URL fetch tools through
+                <strong>Web Search and Fetch</strong>. Pick an engine, add a key
+                if required, and let compatible agents bring web sources into
+                their work.
+              </p>
+              <p>
+                Choose from
+                <strong>Exa, Firecrawl, Tavily, Jina AI, or You.com</strong>.
+                Exa and Firecrawl offer rate-limited anonymous search and fetch.
+                Jina AI offers anonymous fetch; Tavily and You.com require keys.
+              </p>
+              <p class="detail">
+                Off by default. Provider limits apply, and tool support varies
+                by API and agent. Search-service keys stay in VS Code secret
+                storage; queries and page text are not logged.
+              </p>
+            </div>
+            <figure class="story-visual">
+              <div class="mock-panel">
+                <div class="mock-header">
+                  <span>Web Search and Fetch</span
+                  ><span class="mono">Try the provider picker</span>
+                </div>
+                <div class="mock-body">
+                  <div class="mock-label">Choose an engine</div>
+                  <div
+                    class="provider-list"
+                    role="group"
+                    aria-label="Illustrative search provider picker"
+                  >
+                    <button
+                      class="provider"
+                      type="button"
+                      data-provider="Exa"
+                      aria-pressed="true"
+                    >
+                      Exa</button
+                    ><button
+                      class="provider"
+                      type="button"
+                      data-provider="Firecrawl"
+                      aria-pressed="false"
+                    >
+                      Firecrawl</button
+                    ><button
+                      class="provider"
+                      type="button"
+                      data-provider="Tavily"
+                      aria-pressed="false"
+                    >
+                      Tavily</button
+                    ><button
+                      class="provider"
+                      type="button"
+                      data-provider="Jina AI"
+                      aria-pressed="false"
+                    >
+                      Jina AI</button
+                    ><button
+                      class="provider"
+                      type="button"
+                      data-provider="You.com"
+                      aria-pressed="false"
+                    >
+                      You.com
+                    </button>
+                  </div>
+                  <div
+                    class="provider-note"
+                    id="provider-note"
+                    aria-live="polite"
+                  >
+                    Exa · Search and fetch without a key, subject to rate
+                    limits.
+                  </div>
+                  <div class="source-card">
+                    <span class="source-type">Illustrative search result</span
+                    ><strong>Find the relevant documentation</strong>
+                    <p>
+                      A source title and citation help connect the answer to the
+                      page behind it.
+                    </p>
+                  </div>
+                  <div class="source-card">
+                    <span class="source-type">Illustrative fetched page</span
+                    ><strong>Read beyond the snippet</strong>
+                    <p>
+                      Fetch page text for supported URL-reading tools, using the
+                      selected engine.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <figcaption>
+                CONCEPTUAL UI · Picker changes this illustration only. No search
+                request is sent; cards are examples, not actual results.
+              </figcaption>
+            </figure>
+          </article>
+
+          <article
+            class="feature-story reverse"
+            aria-labelledby="routing-title"
+          >
+            <div class="story-copy">
+              <div class="mono">/ 03 &nbsp; Deliberate model routing</div>
+              <h2 id="routing-title">
+                Choose your model mappings<br />and fallback.
+              </h2>
+              <p>
+                Choose your main model in agent setup. If a background task
+                requests a different name, use
+                <strong>Set Fallback Model</strong> to map that specific name to
+                a compatible local model.
+              </p>
+              <p>
+                An optional fallback handles
+                <strong>unknown model names only</strong> for supported APIs.
+                Select a compatible local or remote model explicitly. The
+                default is <strong>No fallback</strong>; the gateway does not
+                pick one for you.
+              </p>
+              <p class="detail">
+                Fallback is not failover: an error from an existing model does
+                not trigger it. Gemini unknown names use mappings or aliases,
+                not the general fallback rule. AI-assisted mapping suggestions
+                can be reviewed before saving and use Copilot quota.
+              </p>
+            </div>
+            <figure class="story-visual">
+              <div class="mock-panel">
+                <div class="mock-header">
+                  <span>Model routing</span
+                  ><span class="mono">Two different jobs</span>
+                </div>
+                <div class="mock-body">
+                  <div class="route">
+                    <div class="route-title">
+                      Specific mapping <span>Explicit rule</span>
+                    </div>
+                    <div class="route-flow">
+                      <span>requested-name</span
+                      ><span class="to" aria-hidden="true">→</span
+                      ><span>chosen-local-model</span>
+                    </div>
+                    <p>Route this name to the model you selected.</p>
+                  </div>
+                  <div class="route">
+                    <div class="route-title">
+                      Unknown-name fallback
+                      <span class="badge">Default: off</span>
+                    </div>
+                    <div class="route-flow">
+                      <span>unknown name</span
+                      ><span class="to" aria-hidden="true">→</span
+                      ><span>No fallback</span>
+                    </div>
+                    <p>
+                      Choose a compatible local or remote model to enable it.
+                    </p>
+                  </div>
+                  <div class="route-notice">
+                    Known model + request error ≠ fallback<br />Gemini → use
+                    mappings or aliases
+                  </div>
+                </div>
+              </div>
+              <figcaption>
+                CONCEPTUAL UI · Generic names illustrate routing semantics, not
+                an available model catalog.
+              </figcaption>
+            </figure>
+          </article>
+
+          <article class="feature-story" aria-labelledby="status-title">
+            <div class="story-copy">
+              <div class="mono">/ 04 &nbsp; See the connection clearly</div>
+              <h2 id="status-title">
+                Copy API URLs.<br />Inspect request logs.
+              </h2>
+              <p>
+                Open <strong>Status</strong> to inspect models, remotes, and
+                recent errors. Under <strong>API URLs</strong>, copy endpoints
+                using your configured port—including Anthropic and Gemini
+                token-count URLs.
+              </p>
+              <p>
+                Use request IDs to follow failures in the output panel or error
+                log. Remote metadata is labeled with the upstream name, so you
+                can see where a request went without logging the conversation.
+              </p>
+              <p class="detail">
+                Prompts, request bodies, tool arguments, search queries, URLs,
+                page text, and keys are not logged. The sample here uses
+                placeholder metadata—not a real request.
+              </p>
+              <a
+                href="https://github.com/ness001/agent-gateway/blob/main/docs/reference.md#endpoints"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Read the API reference ↗</a
+              >
+            </div>
+            <figure class="story-visual">
+              <div class="mock-panel">
+                <div class="mock-header">
+                  <span>Status → API URLs</span
+                  ><span class="mono">Default local port</span>
+                </div>
+                <div class="mock-body">
+                  <div class="api-list">
+                    <div class="api-row">
+                      <div class="api-row-top">
+                        <span>OpenAI Responses</span
+                        ><button
+                          class="copy-btn"
+                          type="button"
+                          data-copy="http://127.0.0.1:24444/v1/responses"
+                          aria-label="Copy example OpenAI Responses URL"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <code>http://127.0.0.1:24444/v1/responses</code>
+                    </div>
+                    <div class="api-row">
+                      <div class="api-row-top">
+                        <span>Anthropic token count</span
+                        ><button
+                          class="copy-btn"
+                          type="button"
+                          data-copy="http://127.0.0.1:24444/v1/messages/count_tokens"
+                          aria-label="Copy example Anthropic token count URL"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <code
+                        >http://127.0.0.1:24444/v1/messages/count_tokens</code
+                      >
+                    </div>
+                    <div class="api-row">
+                      <div class="api-row-top">
+                        <span>Gemini token count · replace &lt;model&gt;</span
+                        ><button
+                          class="copy-btn"
+                          type="button"
+                          data-copy="http://127.0.0.1:24444/v1beta/models/<model>:countTokens"
+                          aria-label="Copy example Gemini token count URL template"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <code
+                        >http://127.0.0.1:24444/v1beta/models/&lt;model&gt;:countTokens</code
+                      >
+                    </div>
+                  </div>
+                  <pre
+                    class="safe-log"
+                  ><span class="safe-log-label"># Illustrative remote request metadata</span>
+[remote][workstation] [example-id]
+POST /v1/responses model=example-model
+status=200</pre>
+                  <p class="copy-status" id="copy-status" role="status">
+                    Example URLs only. No gateway is contacted.
+                  </p>
+                </div>
+              </div>
+              <figcaption>
+                CONCEPTUAL UI · Copy controls work. These are default-port
+                examples, not detected endpoints or live logs.
+              </figcaption>
+            </figure>
+          </article>
+        </section>
+
+        <section class="faq" id="faq" aria-labelledby="faq-title">
+          <div class="faq-head">
+            <div>
+              <div class="mono section-label">03 — Before you begin</div>
+              <h2 id="faq-title">Frequently asked<br />questions.</h2>
+            </div>
+            <div>
+              <details open>
+                <summary>Is this another model subscription?</summary>
+                <p>
+                  No. Agent Gateway is an MIT open-source VS Code extension, not
+                  a model provider. It connects tools to models your signed-in
+                  Copilot account can access. Your provider’s quotas and account
+                  requirements still apply.
+                </p>
+              </details>
+              <details>
+                <summary>Does VS Code need to stay open?</summary>
+                <p>
+                  Yes. The gateway runs inside VS Code. Closing it stops the
+                  local service; shutting down the extension also stops its
+                  tunnel hosting. There is no separate gateway server to deploy.
+                </p>
+              </details>
+              <details>
+                <summary>Does my code stay on my computer?</summary>
+                <p>
+                  The gateway listens on loopback by default, but model requests
+                  still go to the provider that serves the selected model.
+                  Remote gateways and optional web tools introduce the services
+                  you choose. Prompts and keys are not logged; agent settings
+                  and backups may contain a gateway key and should be treated as
+                  sensitive.
+                </p>
+              </details>
+              <details>
+                <summary>Will every agent feature work?</summary>
+                <p>
+                  No. Your agent’s own edits, shell commands, and MCP tools stay
+                  with the agent. Provider-hosted features vary: supported
+                  search and fetch tools can run through the gateway, but hosted
+                  code execution and some other server tools are not supported.
+                  <a
+                    href="https://github.com/ness001/agent-gateway#server-tools"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Check tool support ↗</a
+                  >
+                </p>
+              </details>
+              <details>
+                <summary>Can I undo the setup?</summary>
+                <p>
+                  Yes. Use
+                  <strong>Configure Coding Agents → Remove gateway</strong> to
+                  revert the gateway’s entries. Changed files have backups. You
+                  can also disable the gateway without uninstalling it by
+                  setting <code>agentGateway.enabled</code> to
+                  <code>false</code>.
+                </p>
+              </details>
+            </div>
+          </div>
+        </section>
+        <section class="closing" aria-labelledby="closing-title">
+          <div>
+            <h2 id="closing-title">Make room for your workflow.</h2>
+            <p>Open source. Yours to inspect, adapt, and use.</p>
+          </div>
+          <a
+            class="button"
+            href="https://marketplace.visualstudio.com/items?itemName=ness001.agent-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Get Agent Gateway
+            <span class="arrow" aria-hidden="true">↗</span></a
+          >
+        </section>
+      </main>
+      <footer class="footer">
+        <span>© 2026 Li Liang · Agent Gateway · MIT License</span>
+        <div class="footer-links">
+          <a
+            href="https://github.com/ness001/agent-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Source ↗</a
+          ><a
+            href="https://marketplace.visualstudio.com/items?itemName=ness001.agent-gateway"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Marketplace ↗</a
+          ><a href="#setup">Setup ↑</a>
+        </div>
+      </footer>
+    </div>
+    <script>
+      const providerDescriptions = {
+        Exa: "Search and fetch without a key, subject to rate limits.",
+        Firecrawl: "Search and fetch without a key, subject to rate limits.",
+        Tavily: "Search and fetch require an API key.",
+        "Jina AI":
+          "Fetch without a key, subject to rate limits. Search requires a key.",
+        "You.com": "Search and fetch require an API key.",
+      };
+      document.querySelectorAll("[data-provider]").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll("[data-provider]").forEach((option) => {
+            option.setAttribute("aria-pressed", String(option === button));
+          });
+          document.getElementById("provider-note").textContent =
+            button.dataset.provider +
+            " · " +
+            providerDescriptions[button.dataset.provider];
+        });
+      });
+      document.querySelectorAll("[data-copy]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const status = document.getElementById("copy-status");
+          try {
+            if (!navigator.clipboard || !window.isSecureContext)
+              throw new Error("Clipboard unavailable");
+            await navigator.clipboard.writeText(button.dataset.copy);
+            status.textContent =
+              "Copied example URL. Replace placeholders and use your configured port.";
+          } catch {
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(
+              button.closest(".api-row").querySelector("code"),
+            );
+            selection.removeAllRanges();
+            selection.addRange(range);
+            status.textContent = "URL selected. Press Ctrl+C or ⌘C to copy.";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
