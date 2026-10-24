@@ -2,9 +2,9 @@
 
 ## 0.1.3
 
-- Choose local or remote upstream models in **Set Fallback Model**. Explicitly
-  selected remote models handle unknown model names; the automatic default stays
-  local. Existing model errors do not trigger fallback.
+- Choose local or remote upstream models in **Set Fallback Model**. No model is
+  selected automatically; **No fallback** disables fallback. Unknown model names
+  use only the selected model. Existing model errors do not trigger fallback.
 - Allow slow first output without treating it as an actual request timeout.
 
 ## 0.1.2

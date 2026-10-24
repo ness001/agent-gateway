@@ -21,8 +21,12 @@ const entry = (id: string, upstreamModelId = id): CatalogEntry => ({
   upstreamModelId,
   isAlias: false,
 });
-const resolveId = (reg: CatalogEntry[], model: string, allowFallback = true) =>
-  resolveModel(reg, model, { allowFallback })?.entry.id;
+const resolveId = (
+  reg: CatalogEntry[],
+  model: string,
+  allowFallback = true,
+  fallbackModel?: string,
+) => resolveModel(reg, model, { allowFallback, fallbackModel })?.entry.id;
 
 suite("Gateway model matching", () => {
   test("resolves exact and suffixed routes and rejects unknown models", () => {
@@ -39,15 +43,18 @@ suite("Gateway model matching", () => {
   });
 
   for (const model of ["codex-auto-review", "unknown-model"]) {
-    test(`falls back to Astra for ${model}`, () => {
+    test(`uses explicitly selected Astra for ${model}`, () => {
       const astra = entry("gateway-claude-gpt-6-astra[1m]", "gpt-6-astra[1m]");
-      const r = resolveModel([astra], model, { allowFallback: true });
+      const r = resolveModel([astra], model, {
+        allowFallback: true,
+        fallbackModel: astra.id,
+      });
       assert.strictEqual(r?.entry, astra);
       assert.strictEqual(r?.fallback, true);
     });
   }
 
-  test("fallbackModel setting, default and no fallback", () => {
+  test("fallback requires a usable explicit setting even when Astra is available", () => {
     const reg = [
       entry("gpt-5"),
       entry("gpt-6-astra"),
@@ -61,8 +68,10 @@ suite("Gateway model matching", () => {
         onMissingFallback: (id) => missing.push(id),
       })?.entry.id;
     assert.strictEqual(pick(reg, "gpt-5"), "gpt-5");
-    assert.strictEqual(pick(reg, ""), "gpt-6-astra");
-    assert.strictEqual(pick(reg, "nope"), "gpt-6-astra");
+    assert.strictEqual(pick(reg), undefined);
+    assert.strictEqual(pick(reg, ""), undefined);
+    assert.strictEqual(pick(reg, "  "), undefined);
+    assert.strictEqual(pick(reg, "nope"), undefined);
     assert.strictEqual(pick(reg, "big"), "big");
     assert.deepStrictEqual(missing, ["nope"]);
     assert.strictEqual(pick([entry("gpt-5")], ""), undefined);
@@ -71,7 +80,7 @@ suite("Gateway model matching", () => {
       resolveFallbackModel(reg, { fallbackModel: "gpt-5" })?.source,
       "setting",
     );
-    assert.strictEqual(resolveFallbackModel(reg)?.source, "default");
+    assert.strictEqual(resolveFallbackModel(reg), undefined);
   });
 
   test("remote fallback respects operations, suffixes and availability", () => {
@@ -92,14 +101,14 @@ suite("Gateway model matching", () => {
       resolveFallbackModel(reg, {
         fallbackModel: remote.id,
         operation: "anthropic.messages",
-      })?.entry.id,
-      "gpt-6-astra",
+      }),
+      undefined,
     );
     assert.strictEqual(
       resolveFallbackModel([entry("gpt-6-astra")], {
         fallbackModel: remote.id,
-      })?.entry.id,
-      "gpt-6-astra",
+      }),
+      undefined,
     );
     assert.strictEqual(resolveFallbackModel([remote]), undefined);
   });
@@ -118,16 +127,16 @@ suite("Gateway model matching", () => {
     );
   });
 
-  test("preserves exact and suffix routes before Astra fallback", () => {
+  test("preserves exact and suffix routes before configured fallback", () => {
     const reg = [
       entry("gateway-claude-gpt-6-astra[1m]"),
       entry("sol[1m]"),
       entry("codex-auto-review"),
     ];
-    assert.strictEqual(resolveId(reg, "sol"), "sol[1m]");
-    assert.strictEqual(resolveId(reg, "sol[1m]"), "sol[1m]");
+    assert.strictEqual(resolveId(reg, "sol", true, reg[0].id), "sol[1m]");
+    assert.strictEqual(resolveId(reg, "sol[1m]", true, reg[0].id), "sol[1m]");
     assert.strictEqual(
-      resolveId(reg, "codex-auto-review"),
+      resolveId(reg, "codex-auto-review", true, reg[0].id),
       "codex-auto-review",
     );
   });
@@ -156,7 +165,10 @@ suite("Gateway model matching", () => {
   for (const [name, reg, model] of failing) {
     test(`does not use fallback to hide ${name}`, () => {
       assert.strictEqual(
-        resolveModel(reg, model, { allowFallback: true }),
+        resolveModel(reg, model, {
+          allowFallback: true,
+          fallbackModel: "gateway-claude-gpt-6-astra[1m]",
+        }),
         undefined,
       );
     });
@@ -174,17 +186,26 @@ suite("Gateway model matching", () => {
   test("keeps exact native and alias Luna routes authoritative", () => {
     const reg = local("gpt-6-astra", "gpt-5.6-luna");
     for (const id of ["gpt-5.6-luna", "gateway-claude-gpt-5.6-luna"]) {
-      const r = resolveModel(reg, id, { allowFallback: true });
+      const r = resolveModel(reg, id, {
+        allowFallback: true,
+        fallbackModel: "gpt-6-astra",
+      });
       assert.strictEqual(r?.entry.id, id);
       assert.strictEqual(r?.entry.upstreamModelId, "gpt-5.6-luna");
       assert.strictEqual(r?.fallback, false);
     }
   });
 
-  test("fallback routes unknown models to gpt-6-astra only when allowed", () => {
+  test("fallback routes unknown models to the configured model only when allowed", () => {
     const reg = local("gpt-6-astra");
-    assert.strictEqual(resolveId(reg, "unknown-model"), "gpt-6-astra");
-    assert.strictEqual(resolveId(reg, "unknown-model", false), undefined);
+    assert.strictEqual(
+      resolveId(reg, "unknown-model", true, "gpt-6-astra"),
+      "gpt-6-astra",
+    );
+    assert.strictEqual(
+      resolveId(reg, "unknown-model", false, "gpt-6-astra"),
+      undefined,
+    );
     assert.strictEqual(
       resolveId(local("gpt-5.6-luna"), "unknown-model"),
       undefined,
@@ -194,7 +215,10 @@ suite("Gateway model matching", () => {
   test("resolves only existing suffixed routes and keeps native Astra preferred", () => {
     const reg = local("gpt-6-astra", "gpt-6-astra[1m]", "sol[1m]");
     assert.strictEqual(resolveId(reg, "sol"), "sol[1m]");
-    assert.strictEqual(resolveId(reg, "unknown"), "gpt-6-astra");
+    assert.strictEqual(
+      resolveId(reg, "unknown", true, "gpt-6-astra"),
+      "gpt-6-astra",
+    );
     assert.strictEqual(resolveId(reg, "SOL", false), undefined);
     assert.strictEqual(resolveId(reg, "unknown", false), undefined);
   });
@@ -205,13 +229,10 @@ suite("Gateway model matching", () => {
     assert.strictEqual(resolveId(reg, "unknown"), undefined);
   });
 
-  test("Astra fallback order prefers earlier candidate IDs", () => {
-    const reg = [
-      entry("gateway-claude-gpt-6-astra[1m]"),
-      entry("gpt-6-astra[1m]"),
-      entry("gateway-claude-gpt-6-astra"),
-    ];
-    assert.strictEqual(resolveId(reg, "x"), "gateway-claude-gpt-6-astra");
+  test("configured fallback prefers the exact ID over a suffixed route", () => {
+    const reg = [entry("sol[1m]"), entry("sol")];
+    assert.strictEqual(resolveId(reg, "x", true, "sol"), "sol");
+    assert.strictEqual(resolveId(reg, "x", true, "sol[1m]"), "sol[1m]");
   });
 
   test("named remote models resolve explicitly but never as fallback", () => {
@@ -227,13 +248,14 @@ suite("Gateway model matching", () => {
     assert.strictEqual(resolveId(reg, "gpt-6-astra"), undefined);
   });
 
-  test("fallback skips a remote entry that claims an Astra ID", () => {
+  test("never selects local or remote Astra implicitly", () => {
     const remote: CatalogEntry = { ...entry("gpt-6-astra"), remote: "devbox" };
     assert.strictEqual(resolveId([remote], "unknown"), undefined);
     const localAlias = entry("gateway-claude-gpt-6-astra");
+    assert.strictEqual(resolveId([remote, localAlias], "unknown"), undefined);
     assert.strictEqual(
-      resolveId([remote, localAlias], "unknown"),
-      "gateway-claude-gpt-6-astra",
+      resolveId([remote, localAlias], "unknown", true, localAlias.id),
+      localAlias.id,
     );
   });
 
@@ -274,7 +296,11 @@ suite("Gateway model matching", () => {
       },
     ];
     const reason = (id: string, remotes = states) =>
-      resolveModel(astraReg(), id, { allowFallback: true, remotes })?.reason;
+      resolveModel(astraReg(), id, {
+        allowFallback: true,
+        fallbackModel: "gpt-6-astra",
+        remotes,
+      })?.reason;
 
     test("unknown model", () =>
       assert.strictEqual(reason("nope"), "unknown model"));
@@ -299,7 +325,10 @@ suite("Gateway model matching", () => {
     });
     test("default remotes is empty", () =>
       assert.strictEqual(
-        resolveModel(astraReg(), "devbox--x", { allowFallback: true })?.reason,
+        resolveModel(astraReg(), "devbox--x", {
+          allowFallback: true,
+          fallbackModel: "gpt-6-astra",
+        })?.reason,
         "remote 'devbox' is not configured",
       ));
     test("explainUnknownModel prefers the longest remote prefix", () =>
@@ -337,11 +366,11 @@ suite("Gateway model aliases", () => {
     assert.strictEqual(alias("gemini-9-ultra"), undefined);
   });
 
-  test("falls back to Astra when no local Gemini model exists", () => {
+  test("does not select Astra implicitly when no local Gemini model exists", () => {
     const reg = [entry("gpt-5"), entry("gpt-6-astra")];
     assert.strictEqual(
-      resolveModelAlias(reg, "gemini-3-pro-preview", { operation: op })?.id,
-      "gpt-6-astra",
+      resolveModelAlias(reg, "gemini-3-pro-preview", { operation: op }),
+      undefined,
     );
   });
 
@@ -358,8 +387,8 @@ suite("Gateway model aliases", () => {
       resolveModelAlias(reg, "gemini-3-pro-preview", {
         operation: op,
         fallbackModel: "nope",
-      })?.id,
-      "gpt-6-astra",
+      }),
+      undefined,
     );
     assert.strictEqual(
       resolveModelAlias(reg, "gemini-3-pro-preview", {

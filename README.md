@@ -84,10 +84,11 @@ this order:
    `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`,
    `gemini-3-pro-preview`): the newest Gemini model in your list with "flash"
    (or "pro") in its name.
-4. Any other name: the model in `agentGateway.fallbackModel`, else
-   `gpt-6-astra` if your list has it, else the request fails. A Gemini request
-   with an unknown name fails instead. Run **Set Fallback Model** to choose a
-   local or remote upstream model; **Status** shows which fallback model is in use.
+4. Any other name: the explicitly selected model in `agentGateway.fallbackModel`,
+   otherwise the request fails. No fallback model is selected automatically.
+   A Gemini request with an unknown name fails instead. Run **Set Fallback Model**
+   to choose a local or remote upstream model, or **No fallback** to disable it.
+   **Status** shows which fallback model is in use.
 
 Every substitution is written to the **Agent Gateway** output panel, for
 example `Model fallback: requested "gpt-5.5" -> using "gpt-6-astra"`, and sent

@@ -126,13 +126,14 @@ require a lower value after configuration; rerunning Configure resets it to
 
 A request for an unknown model falls back to the fallback model (logged as a
 warning and reported in the `x-agent-gateway-model-fallback` header). The
-fallback model is `agentGateway.fallbackModel` if it names a model in your
-local or remote model list, else local `gpt-6-astra` if available; otherwise
-the request fails. Select a remote model in **Set Fallback Model**, or set its
-prefixed ID (`{name}--{modelId}`) in `agentGateway.fallbackModel`. Remote models
-are used only when explicitly selected, never as the automatic default.
-A setting that names a missing model logs a warning and uses the local default.
-Gemini requests do not fall back, except through aliases. **Status** and `/health` (`fallbackModel`) show the model in use.
+fallback model is `agentGateway.fallbackModel` if it names an available local
+or remote model that supports the requested API; otherwise the request fails.
+No model is selected automatically. Use **Set Fallback Model** to choose one,
+or **No fallback** to disable it. Remote IDs use `{name}--{modelId}`.
+A setting that names a missing or incompatible model logs a warning; it does
+not select a different model. Errors from an existing model do not trigger fallback.
+Gemini requests do not fall back, except through aliases. **Status** and `/health`
+(`fallbackModel`) show the model in use.
 
 `agentGateway.modelAliases` maps a requested name to one of your models for
 every API, for example `{"my-model": "gpt-5.6-sol"}`. Built-in aliases cover

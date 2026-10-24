@@ -35,7 +35,7 @@ function health(over: Partial<HealthSnapshot> = {}): HealthSnapshot {
     lastStartupError: null,
     remotes: [],
     fallbackModel: "gpt-6-astra",
-    fallbackModelSource: "default",
+    fallbackModelSource: "setting",
     errors: { counts: {}, recent: [] },
     ...over,
   };
@@ -186,14 +186,11 @@ suite("commands/status", () => {
       i.label.startsWith("Fallback model:"),
     );
     assert.strictEqual(line?.label, "Fallback model: gpt-6-astra");
-    assert.strictEqual(line?.description, "default");
+    assert.strictEqual(line?.description, "setting");
     assert.ok(
       statusItems(
         health({ fallbackModel: null, fallbackModelSource: null }),
-      ).some(
-        (i) =>
-          i.label === "Fallback model: none — set agentGateway.fallbackModel",
-      ),
+      ).some((i) => i.label === "Fallback model: none"),
     );
   });
 
@@ -239,7 +236,7 @@ suite("commands/status", () => {
     assert.strictEqual(items[1].action, "initializeMappings");
     const def = fallbackModelItems(models, { id: null, source: null });
     assert.strictEqual(def[0].description, "current");
-    assert.strictEqual(def[0].label, "Use default (gpt-6-astra if available)");
+    assert.strictEqual(def[0].label, "No fallback");
   });
 
   test("no error section without errors", () => {

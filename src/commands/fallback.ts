@@ -15,21 +15,21 @@ export interface FallbackModelItem {
 }
 
 /**
- * Items of the Set Fallback Model picker: "Use default", AI initialization, then the user's own
+ * Items of the Set Fallback Model picker: "No fallback", AI initialization, then the user's own
  * local and remote non-alias models sorted by ID. The current fallback is marked with
  * its source.
  */
 export function fallbackModelItems(
   models: readonly (Pick<CatalogEntry, "id" | "displayName"> &
     Partial<Pick<CatalogEntry, "remote" | "isAlias">>)[],
-  current: { id: string | null; source: "setting" | "default" | null },
+  current: { id: string | null; source: "setting" | null },
   aliases: Record<string, string> = {},
 ): FallbackModelItem[] {
   const mark = (id: string): string | undefined =>
     current.id === id ? `current (${current.source})` : undefined;
   return [
     {
-      label: "Use default (gpt-6-astra if available)",
+      label: "No fallback",
       id: "",
       description: current.source === "setting" ? undefined : "current",
     },
@@ -105,7 +105,7 @@ export async function setFallbackModel(
       picked.id === "" ? undefined : picked.id,
       vscode.ConfigurationTarget.Global,
     );
-  const now = picked.id || gw.health().fallbackModel;
+  const now = picked.id;
   void vscode.window.showInformationMessage(
     now
       ? `Fallback model: ${now}. Agents asking for a model you don't have now use it.`

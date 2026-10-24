@@ -60,7 +60,7 @@ export function statusItems(
           label: `Fallback model: ${h.fallbackModel}`,
           description: h.fallbackModelSource ?? undefined,
         }
-      : { label: "Fallback model: none — set agentGateway.fallbackModel" },
+      : { label: "Fallback model: none" },
     {
       label: `Copilot Chat: ${h.copilot.installed ? (h.copilot.active ? "active" : "installed, inactive") : "not installed"}`,
     },
