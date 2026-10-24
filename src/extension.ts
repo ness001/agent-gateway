@@ -16,6 +16,7 @@ import {
   hiddenSetApiKey,
   setGatewayApiKey,
   shareViaDevTunnel,
+  stopDevTunnelHosting,
 } from "./commands/share";
 import { copyHealth, openErrorLog, showStatus } from "./commands/status";
 import { setWebSearchEngine } from "./commands/webSearch";
@@ -183,6 +184,6 @@ export function activate(context: vscode.ExtensionContext): Gateway {
 }
 
 export async function deactivate(): Promise<void> {
-  await gateway?.stop();
+  await Promise.all([gateway?.stop(), stopDevTunnelHosting()]);
   gateway = undefined;
 }

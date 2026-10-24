@@ -29,6 +29,64 @@ export interface StatusItem {
   detail?: string;
   separator?: boolean;
   action?: StatusAction;
+  url?: string;
+}
+
+function apiUrlItems(h: HealthSnapshot): StatusItem[] {
+  if (!h.listener.active || !h.listener.address) {
+    return [];
+  }
+  const base = h.listener.address.replace(/\/+$/, "");
+  const geminiDetail =
+    "Select to copy. Replace {model} with a model ID from GET /v1/models.";
+  return [
+    { label: "API URLs — select to copy", separator: true },
+    ...[
+      ["Gateway base URL", "", "Base URL for Anthropic and Gemini clients."],
+      [
+        "OpenAI-compatible base URL",
+        "/v1",
+        "Base URL for OpenAI-compatible clients.",
+      ],
+      ["Models", "/v1/models", "GET — available model IDs for all APIs."],
+      [
+        "Chat Completions",
+        "/v1/chat/completions",
+        "POST — OpenAI-compatible chat.",
+      ],
+      ["Responses", "/v1/responses", "POST — OpenAI-compatible responses."],
+      [
+        "Anthropic messages",
+        "/v1/messages",
+        "POST — Anthropic-compatible messages.",
+      ],
+      [
+        "Anthropic count tokens",
+        "/v1/messages/count_tokens",
+        "POST — returns input_tokens; no OpenAI token-count endpoint.",
+      ],
+      [
+        "Gemini generate content",
+        "/v1beta/models/{model}:generateContent",
+        geminiDetail,
+      ],
+      [
+        "Gemini stream content",
+        "/v1beta/models/{model}:streamGenerateContent?alt=sse",
+        geminiDetail,
+      ],
+      [
+        "Gemini count tokens",
+        "/v1beta/models/{model}:countTokens",
+        `${geminiDetail} POST — returns totalTokens.`,
+      ],
+    ].map(([label, suffix, detail]) => ({
+      label: `$(copy) ${label}`,
+      description: `${base}${suffix}`,
+      detail,
+      url: `${base}${suffix}`,
+    })),
+  ];
 }
 
 const ACTIONS: [StatusAction, string, string?][] = [
@@ -45,7 +103,7 @@ const ACTIONS: [StatusAction, string, string?][] = [
   ["clients", "$(gear) Configure coding agents"],
 ];
 
-/** Items of the Status picker: state lines, recent errors, then actions. */
+/** Items of the Status picker: state, recent errors, API URLs, then actions. */
 export function statusItems(
   h: HealthSnapshot,
   logLevel: GatewayLogLevel = "info",
@@ -60,7 +118,7 @@ export function statusItems(
           label: `Fallback model: ${h.fallbackModel}`,
           description: h.fallbackModelSource ?? undefined,
         }
-      : { label: "Fallback model: none — set agentGateway.fallbackModel" },
+      : { label: "Fallback model: none" },
     {
       label: `Copilot Chat: ${h.copilot.installed ? (h.copilot.active ? "active" : "installed, inactive") : "not installed"}`,
     },
@@ -82,6 +140,7 @@ export function statusItems(
           })),
         ]
       : []),
+    ...apiUrlItems(h),
     { label: "Actions", separator: true },
     ...ACTIONS.map(([action, label, description]) => ({
       label,
@@ -136,6 +195,11 @@ export async function showStatus(
   const picked = await vscode.window.showQuickPick(items, {
     title: "Agent Gateway",
   });
+  if (picked?.url) {
+    await vscode.env.clipboard.writeText(picked.url);
+    void vscode.window.showInformationMessage("Gateway API URL copied.");
+    return;
+  }
   if (!picked?.action) {
     return;
   }

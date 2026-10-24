@@ -1,12 +1,5 @@
 import type { CatalogEntry, ProtocolOperation, RemoteState } from "./types";
 
-export const ASTRA_FALLBACK_IDS = [
-  "gpt-6-astra",
-  "gateway-claude-gpt-6-astra",
-  "gpt-6-astra[1m]",
-  "gateway-claude-gpt-6-astra[1m]",
-];
-
 const isBlank = (s: string): boolean => s.trim() === "";
 
 /**
@@ -69,11 +62,11 @@ export interface ResolvedModel {
 }
 
 export interface FallbackOptions {
-  /** `agentGateway.fallbackModel`; empty uses the default. */
+  /** `agentGateway.fallbackModel`; empty disables fallback. */
   fallbackModel?: string;
   /** Only models serving this operation are chosen when set. */
   operation?: ProtocolOperation;
-  /** Called when `fallbackModel` names no usable local model. */
+  /** Called when `fallbackModel` names no usable model. */
   onMissingFallback?: (id: string) => void;
 }
 
@@ -83,36 +76,34 @@ type FallbackCandidate = Pick<CatalogEntry, "id" | "remote"> & {
 
 export interface FallbackChoice<T extends FallbackCandidate = CatalogEntry> {
   entry: T;
-  source: "setting" | "default";
+  source: "setting";
 }
 
 /**
  * The unknown-model fallback: `agentGateway.fallbackModel` when it names a
- * local model, else `gpt-6-astra`, else none. Remote models are never chosen.
+ * usable local or remote model, else none.
  */
 export function resolveFallbackModel<T extends FallbackCandidate>(
   reg: T[],
   opts: FallbackOptions = {},
 ): FallbackChoice<T> | undefined {
-  const local = reg.filter(
+  const candidates = reg.filter(
     (e) =>
-      e.remote === undefined &&
-      (opts.operation === undefined ||
-        (e.operations ?? []).includes(opts.operation)),
+      opts.operation === undefined ||
+      (e.operations ?? []).includes(opts.operation),
   );
   const configured = opts.fallbackModel?.trim();
   if (configured) {
     const ids = configured.endsWith("[1m]")
       ? [configured]
       : [configured, configured + "[1m]"];
-    const found = firstPresent(local, ids);
+    const found = firstPresent(candidates, ids);
     if (found) {
       return { entry: found, source: "setting" };
     }
     opts.onMissingFallback?.(configured);
   }
-  const astra = firstPresent(local, ASTRA_FALLBACK_IDS);
-  return astra ? { entry: astra, source: "default" } : undefined;
+  return undefined;
 }
 
 export function resolveModel(
@@ -206,7 +197,7 @@ export function bestLocalGeminiModel(
 }
 
 export interface AliasOptions {
-  /** `agentGateway.modelAliases`; an empty value disables a default. */
+  /** `agentGateway.modelMappings`; an empty value disables a default. */
   userAliases?: Readonly<Record<string, unknown>>;
   /** `agentGateway.webSearch.model`, used for search side requests. */
   searchModel?: string;
@@ -222,8 +213,9 @@ export interface AliasOptions {
  * Resolves a requested model that has no route through the model aliases.
  * Order: user alias (exact target; empty disables), the configured search
  * model for hosted-search side requests, then the built-in Gemini CLI names
- * (best local Gemini Flash/Pro, else the fallback model). Remote models are
- * never chosen; targets that do not serve the operation are skipped.
+ * (best local Gemini Flash/Pro, else the fallback model). Explicit alias and
+ * search targets stay local; the configured fallback may be remote. Targets
+ * that do not serve the operation are skipped.
  */
 export function resolveModelAlias(
   reg: CatalogEntry[],

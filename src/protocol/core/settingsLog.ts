@@ -6,6 +6,7 @@ export interface SettingsLogMeta {
   readonly protocol: ProtocolId;
   readonly requestedModel: string;
   readonly resolvedModel: string;
+  readonly remote?: string;
 }
 
 /**
@@ -59,27 +60,180 @@ export function settingsFromRequest(req: CoreRequest): RequestSettings {
   };
 }
 
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function finite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function effort(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  switch (value.toLowerCase()) {
+    case "none":
+    case "minimal":
+    case "low":
+    case "medium":
+    case "high":
+    case "xhigh":
+    case "max":
+    case "adaptive":
+    case "enabled":
+    case "disabled":
+      return value.toLowerCase();
+    default:
+      return "redacted";
+  }
+}
+
+const HOSTED_TYPES = new Set([
+  "web_search",
+  "web_search_preview",
+  "web_search_preview_2025_03_11",
+  "web_search_20250305",
+  "web_search_20260209",
+  "web_fetch_20250910",
+  "web_fetch_20260209",
+  "file_search",
+  "code_interpreter",
+  "computer_use_preview",
+  "mcp",
+]);
+
+/** Best-effort metadata only: never decode, validate or alter a passthrough body. */
+export function settingsFromWire(
+  protocol: ProtocolId,
+  value: unknown,
+  geminiAction?: string,
+): RequestSettings {
+  const body = record(value);
+  const gemini = protocol === "gemini";
+  const anthropic = protocol === "anthropic";
+  const generation = gemini ? record(body.generationConfig) : body;
+  const tools = Array.isArray(body.tools) ? body.tools : [];
+  const hostedTools: string[] = [];
+  let toolCount = 0;
+  for (const value of tools) {
+    const tool = record(value);
+    if (gemini) {
+      if (Array.isArray(tool.functionDeclarations)) {
+        toolCount += tool.functionDeclarations.length;
+      }
+      for (const key of [
+        "googleSearch",
+        "googleSearchRetrieval",
+        "urlContext",
+        "codeExecution",
+      ]) {
+        if (Object.hasOwn(tool, key) && !hostedTools.includes(key)) {
+          hostedTools.push(key);
+        }
+      }
+    } else if (typeof tool.type === "string" && HOSTED_TYPES.has(tool.type)) {
+      if (!hostedTools.includes(tool.type)) {
+        hostedTools.push(tool.type);
+      }
+    } else {
+      toolCount++;
+    }
+  }
+  const choice = gemini
+    ? record(record(body.toolConfig).functionCallingConfig).mode
+    : typeof body.tool_choice === "string"
+      ? body.tool_choice
+      : record(body.tool_choice).type;
+  let toolChoice: RequestSettings["toolChoice"] = "auto";
+  switch (choice) {
+    case "none":
+    case "NONE":
+      toolChoice = "none";
+      break;
+    case "required":
+    case "any":
+    case "ANY":
+    case "tool":
+    case "function":
+      toolChoice = "required";
+  }
+  const stop = gemini
+    ? generation.stopSequences
+    : anthropic
+      ? body.stop_sequences
+      : body.stop;
+  const cacheKey = gemini ? body.cachedContent : body.prompt_cache_key;
+  const parallel = anthropic
+    ? record(body.tool_choice).disable_parallel_tool_use
+    : body.parallel_tool_calls;
+  return {
+    maxOutputTokens: gemini
+      ? finite(generation.maxOutputTokens)
+      : protocol === "openai-responses"
+        ? finite(body.max_output_tokens)
+        : (finite(body.max_completion_tokens) ?? finite(body.max_tokens)),
+    temperature: finite(generation.temperature),
+    topP: finite(gemini ? generation.topP : body.top_p),
+    stopCount: Array.isArray(stop)
+      ? stop.length
+      : typeof stop === "string"
+        ? 1
+        : 0,
+    reasoningEffort: effort(
+      gemini
+        ? record(generation.thinkingConfig).thinkingLevel
+        : anthropic
+          ? (record(body.output_config).effort ?? record(body.thinking).type)
+          : protocol === "openai-responses"
+            ? record(body.reasoning).effort
+            : body.reasoning_effort,
+    ),
+    toolCount,
+    toolChoice,
+    hostedTools,
+    parallelToolCalls:
+      typeof parallel === "boolean"
+        ? anthropic
+          ? !parallel
+          : parallel
+        : undefined,
+    stream: gemini
+      ? geminiAction === "streamGenerateContent"
+      : body.stream === true,
+    cacheKeyPresent: typeof cacheKey === "string" && cacheKey !== "",
+  };
+}
+
 /** Formats the single settings line. Exported for tests. */
 export function formatSettingsLine(
   meta: SettingsLogMeta,
   s: RequestSettings,
 ): string {
   const parts: string[] = [
-    `[${token(meta.requestId)}] ${meta.protocol} settings`,
+    `${meta.remote !== undefined ? `[remote][${token(meta.remote)}] ` : ""}[${token(meta.requestId)}] ${meta.protocol} settings`,
     `model=${quoted(meta.requestedModel)}`,
     `resolved=${quoted(meta.resolvedModel)}`,
     `max_tokens=${num(s.maxOutputTokens) ?? "none"}`,
   ];
+  if (meta.remote !== undefined) {
+    parts.push("forwarded=true");
+  }
+  const ignored = meta.remote === undefined ? "(ignored)" : "";
   const t = num(s.temperature);
   if (t !== undefined) {
-    parts.push(`temperature=${t}(ignored)`);
+    parts.push(`temperature=${t}${ignored}`);
   }
   const p = num(s.topP);
   if (p !== undefined) {
-    parts.push(`top_p=${p}(ignored)`);
+    parts.push(`top_p=${p}${ignored}`);
   }
   if (s.stopCount > 0) {
-    parts.push(`stop=${s.stopCount}(ignored)`);
+    parts.push(`stop=${s.stopCount}${ignored}`);
   }
   parts.push(
     `reasoning=${s.reasoningEffort ? token(s.reasoningEffort) : "none"}`,
