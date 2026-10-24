@@ -223,9 +223,18 @@ suite("commands/status", () => {
           "(empty — no mapping)",
           "Choose a different target or clear this mapping. Does not change the fallback.",
         ],
+        ["box--gpt-9", undefined, "r"],
         ["claude-x", undefined, undefined],
         ["gpt-5", "current (setting)", "GPT-5"],
       ],
+    );
+    const remote = fallbackModelItems(models, {
+      id: "box--gpt-9",
+      source: "setting",
+    });
+    assert.strictEqual(
+      remote.find((i) => i.id === "box--gpt-9")?.description,
+      "current (setting)",
     );
     assert.strictEqual(items[1].action, "initializeMappings");
     const def = fallbackModelItems(models, { id: null, source: null });

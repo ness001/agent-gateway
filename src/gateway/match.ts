@@ -73,7 +73,7 @@ export interface FallbackOptions {
   fallbackModel?: string;
   /** Only models serving this operation are chosen when set. */
   operation?: ProtocolOperation;
-  /** Called when `fallbackModel` names no usable local model. */
+  /** Called when `fallbackModel` names no usable model. */
   onMissingFallback?: (id: string) => void;
 }
 
@@ -88,30 +88,32 @@ export interface FallbackChoice<T extends FallbackCandidate = CatalogEntry> {
 
 /**
  * The unknown-model fallback: `agentGateway.fallbackModel` when it names a
- * local model, else `gpt-6-astra`, else none. Remote models are never chosen.
+ * local or remote model, else local `gpt-6-astra`, else none.
  */
 export function resolveFallbackModel<T extends FallbackCandidate>(
   reg: T[],
   opts: FallbackOptions = {},
 ): FallbackChoice<T> | undefined {
-  const local = reg.filter(
+  const candidates = reg.filter(
     (e) =>
-      e.remote === undefined &&
-      (opts.operation === undefined ||
-        (e.operations ?? []).includes(opts.operation)),
+      opts.operation === undefined ||
+      (e.operations ?? []).includes(opts.operation),
   );
   const configured = opts.fallbackModel?.trim();
   if (configured) {
     const ids = configured.endsWith("[1m]")
       ? [configured]
       : [configured, configured + "[1m]"];
-    const found = firstPresent(local, ids);
+    const found = firstPresent(candidates, ids);
     if (found) {
       return { entry: found, source: "setting" };
     }
     opts.onMissingFallback?.(configured);
   }
-  const astra = firstPresent(local, ASTRA_FALLBACK_IDS);
+  const astra = firstPresent(
+    candidates.filter((e) => e.remote === undefined),
+    ASTRA_FALLBACK_IDS,
+  );
   return astra ? { entry: astra, source: "default" } : undefined;
 }
 
@@ -222,8 +224,9 @@ export interface AliasOptions {
  * Resolves a requested model that has no route through the model aliases.
  * Order: user alias (exact target; empty disables), the configured search
  * model for hosted-search side requests, then the built-in Gemini CLI names
- * (best local Gemini Flash/Pro, else the fallback model). Remote models are
- * never chosen; targets that do not serve the operation are skipped.
+ * (best local Gemini Flash/Pro, else the fallback model). Explicit alias and
+ * search targets stay local; the configured fallback may be remote. Targets
+ * that do not serve the operation are skipped.
  */
 export function resolveModelAlias(
   reg: CatalogEntry[],

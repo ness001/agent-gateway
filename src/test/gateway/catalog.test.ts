@@ -346,7 +346,7 @@ suite("Gateway catalogue", () => {
       );
       const lines = summarizeModels(reg, "nope");
       assert.deepStrictEqual(lines.slice(-2), [
-        'agentGateway.fallbackModel "nope" is not an available local model; using the default fallback.',
+        'agentGateway.fallbackModel "nope" is not an available model; using the default fallback.',
         'Unknown-model fallback (non-Gemini): "gpt-6-astra"',
       ]);
     });
@@ -363,10 +363,14 @@ suite("Gateway catalogue", () => {
       assert.ok(lines.includes('  "alias" -> ' + JSON.stringify(unsafe)));
     });
 
-    test("groups by upstream identity and never advertises a remote fallback", () => {
+    test("groups by upstream identity and requires an explicit remote fallback", () => {
       const reg = buildRegistry(
         [],
         [{ name: "devbox", models: [m("gpt-6-astra")] }],
+      );
+      assert.strictEqual(
+        summarizeModels(reg, "devbox--gpt-6-astra").at(-1),
+        'Unknown-model fallback (non-Gemini): "devbox--gpt-6-astra"',
       );
       const lines = summarizeModels(reg);
       assert.ok(lines.includes("GPT (1):"));

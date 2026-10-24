@@ -86,8 +86,8 @@ this order:
    (or "pro") in its name.
 4. Any other name: the model in `agentGateway.fallbackModel`, else
    `gpt-6-astra` if your list has it, else the request fails. A Gemini request
-   with an unknown name fails instead. Run **Set Fallback Model** to choose it;
-   **Status** shows which fallback model is in use.
+   with an unknown name fails instead. Run **Set Fallback Model** to choose a
+   local or remote upstream model; **Status** shows which fallback model is in use.
 
 Every substitution is written to the **Agent Gateway** output panel, for
 example `Model fallback: requested "gpt-5.5" -> using "gpt-6-astra"`, and sent

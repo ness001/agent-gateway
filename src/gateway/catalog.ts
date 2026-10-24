@@ -229,12 +229,12 @@ export function summarizeModels(
   })?.entry;
   if (missing !== undefined) {
     lines.push(
-      `agentGateway.fallbackModel ${JSON.stringify(missing)} is not an available local model; using the default fallback.`,
+      `agentGateway.fallbackModel ${JSON.stringify(missing)} is not an available model; using the default fallback.`,
     );
   }
   lines.push(
     fallback
-      ? `Unknown-model fallback (non-Gemini): ${JSON.stringify(fallback.upstreamModelId)}`
+      ? `Unknown-model fallback (non-Gemini): ${JSON.stringify(fallback.id)}`
       : "Unknown-model fallback: unavailable",
   );
   return lines;

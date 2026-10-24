@@ -518,7 +518,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       if (!warnedFallbacks.has(id)) {
         warnedFallbacks.add(id);
         deps.logger.warn(
-          `agentGateway.fallbackModel ${logId(id)} is not an available local model; using the default fallback.`,
+          `agentGateway.fallbackModel ${logId(id)} is not an available model; using the default fallback.`,
         );
       }
     },
