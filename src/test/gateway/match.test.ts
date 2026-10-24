@@ -63,8 +63,8 @@ suite("Gateway model matching", () => {
     assert.strictEqual(pick(reg, "gpt-5"), "gpt-5");
     assert.strictEqual(pick(reg, ""), "gpt-6-astra");
     assert.strictEqual(pick(reg, "nope"), "gpt-6-astra");
-    assert.strictEqual(pick(reg, "big"), "gpt-6-astra");
-    assert.deepStrictEqual(missing, ["nope", "big"]);
+    assert.strictEqual(pick(reg, "big"), "big");
+    assert.deepStrictEqual(missing, ["nope"]);
     assert.strictEqual(pick([entry("gpt-5")], ""), undefined);
     assert.strictEqual(pick([entry("gpt-5")], "nope"), undefined);
     assert.strictEqual(
@@ -72,6 +72,36 @@ suite("Gateway model matching", () => {
       "setting",
     );
     assert.strictEqual(resolveFallbackModel(reg)?.source, "default");
+  });
+
+  test("remote fallback respects operations, suffixes and availability", () => {
+    const remote = {
+      ...entry("box--gpt-5[1m]", "gpt-5[1m]"),
+      remote: "box",
+      operations: ["openai.responses" as const],
+    };
+    const reg = [entry("gpt-6-astra"), remote];
+    assert.strictEqual(
+      resolveFallbackModel(reg, {
+        fallbackModel: "box--gpt-5",
+        operation: "openai.responses",
+      })?.entry,
+      remote,
+    );
+    assert.strictEqual(
+      resolveFallbackModel(reg, {
+        fallbackModel: remote.id,
+        operation: "anthropic.messages",
+      })?.entry.id,
+      "gpt-6-astra",
+    );
+    assert.strictEqual(
+      resolveFallbackModel([entry("gpt-6-astra")], {
+        fallbackModel: remote.id,
+      })?.entry.id,
+      "gpt-6-astra",
+    );
+    assert.strictEqual(resolveFallbackModel([remote]), undefined);
   });
 
   test("does not report fallback for normal routing", () => {

@@ -16,7 +16,7 @@ export interface FallbackModelItem {
 
 /**
  * Items of the Set Fallback Model picker: "Use default", AI initialization, then the user's own
- * local, non-alias models sorted by ID. The current fallback is marked with
+ * local and remote non-alias models sorted by ID. The current fallback is marked with
  * its source.
  */
 export function fallbackModelItems(
@@ -52,7 +52,7 @@ export function fallbackModelItems(
         }),
       ),
     ...models
-      .filter((m) => m.remote === undefined && !m.isAlias)
+      .filter((m) => !m.isAlias)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((m) => ({
         label: m.id,

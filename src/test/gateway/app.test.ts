@@ -268,8 +268,13 @@ suite("Gateway app", () => {
     setting = "box--gpt-5-remote";
     const remote = await app.fetch(post("/v1/messages", { model: "x" }));
     assert.strictEqual(remote.status, 200);
-    assert.strictEqual(h.remote.length, 0);
-    assert.strictEqual((await h.local[3].json()).model, "gpt-6-astra");
+    assert.strictEqual(h.remote.length, 1);
+    assert.strictEqual(h.local.length, 3);
+    assert.strictEqual(JSON.parse(h.remote[0].body!).model, "gpt-5-remote");
+    assert.strictEqual(
+      remote.headers.get("x-agent-gateway-model-fallback"),
+      "x -> box--gpt-5-remote; reason=unknown model",
+    );
   });
 
   test("Gemini CLI internal model names alias to the Astra fallback without a local Gemini model", async () => {
