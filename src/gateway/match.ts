@@ -197,7 +197,7 @@ export function bestLocalGeminiModel(
 }
 
 export interface AliasOptions {
-  /** `agentGateway.modelAliases`; an empty value disables a default. */
+  /** `agentGateway.modelMappings`; an empty value disables a default. */
   userAliases?: Readonly<Record<string, unknown>>;
   /** `agentGateway.webSearch.model`, used for search side requests. */
   searchModel?: string;

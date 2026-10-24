@@ -10,7 +10,7 @@ import {
 } from "../gateway/modelMapping";
 import { CONFIG_SECTION } from "../utils/config";
 
-/** Generate and review explicit modelAliases without changing the fallback. */
+/** Generate and review explicit modelMappings without changing the fallback. */
 export async function initializeModelMappings(
   gw: Pick<Gateway, "nativeModels">,
 ): Promise<void> {
@@ -55,7 +55,9 @@ export async function initializeModelMappings(
       return;
     }
     const snapshot = JSON.stringify(
-      vscode.workspace.getConfiguration(CONFIG_SECTION).get("modelAliases", {}),
+      vscode.workspace
+        .getConfiguration(CONFIG_SECTION)
+        .get("modelMappings", {}),
     );
     const response = await vscode.window.withProgress(
       {
@@ -142,7 +144,7 @@ export async function initializeModelMappings(
       return;
     }
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const current = config.get<Record<string, string>>("modelAliases", {});
+    const current = config.get<Record<string, string>>("modelMappings", {});
     if (JSON.stringify(current) !== snapshot) {
       throw new Error(
         "Mappings changed while AI was running. Run the command again to review current settings.",
@@ -158,9 +160,9 @@ export async function initializeModelMappings(
     for (const { mapping } of picked) {
       aliases[mapping.source] = mapping.target;
     }
-    const inspected = config.inspect("modelAliases");
+    const inspected = config.inspect("modelMappings");
     await config.update(
-      "modelAliases",
+      "modelMappings",
       aliases,
       inspected?.workspaceValue !== undefined
         ? vscode.ConfigurationTarget.Workspace
@@ -184,7 +186,7 @@ export async function editModelMapping(
 ): Promise<void> {
   try {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const before = config.get<Record<string, string>>("modelAliases", {});
+    const before = config.get<Record<string, string>>("modelMappings", {});
     const current = before[source] ?? "";
     const snapshot = JSON.stringify(before);
     // Aliases are shared across protocols; local native targets remain editable
@@ -217,7 +219,7 @@ export async function editModelMapping(
       return;
     }
     const latest = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const aliases = latest.get<Record<string, string>>("modelAliases", {});
+    const aliases = latest.get<Record<string, string>>("modelMappings", {});
     if (JSON.stringify(aliases) !== snapshot) {
       throw new Error("Mappings changed during selection.");
     }
@@ -231,9 +233,9 @@ export async function editModelMapping(
     ) {
       throw new Error("Selected model is no longer available.");
     }
-    const inspected = latest.inspect("modelAliases");
+    const inspected = latest.inspect("modelMappings");
     await latest.update(
-      "modelAliases",
+      "modelMappings",
       { ...aliases, [source]: selected.id },
       inspected?.workspaceValue !== undefined
         ? vscode.ConfigurationTarget.Workspace

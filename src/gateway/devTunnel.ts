@@ -1,11 +1,159 @@
-import { execFile } from "node:child_process";
+import {
+  type ChildProcess,
+  type SpawnOptions,
+  execFile,
+  spawn,
+} from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 export const DEV_TUNNEL_DOCS_URL =
   "https://learn.microsoft.com/azure/developer/dev-tunnels/get-started";
-export const DEV_TUNNEL_TERMINAL_NAME = "Agent Gateway Dev Tunnel";
 export const DEV_TUNNEL_EXPIRATION = "30d";
+
+export type SpawnFn = (
+  file: string,
+  args: string[],
+  options: SpawnOptions,
+) => ChildProcess;
+
+export interface TunnelHostExit {
+  kind: "error" | "exit";
+  code?: number | null;
+  signal?: NodeJS.Signals | null;
+}
+
+/** Owns only the background host; CLI installation and login remain interactive. */
+export class DevTunnelHost {
+  private child: ChildProcess | undefined;
+  private starting: Promise<void> | undefined;
+  private stopping: Promise<void> | undefined;
+  private disposed = false;
+
+  constructor(
+    private readonly spawnHost: SpawnFn = spawn,
+    private readonly onUnexpectedExit?: (exit: TunnelHostExit) => void,
+    private readonly stopTimeoutMs = 2000,
+  ) {}
+
+  get active(): boolean {
+    return this.child !== undefined;
+  }
+
+  start(cli: string, tunnelId: string): Promise<void> {
+    if (this.disposed) {
+      return Promise.reject(new Error("Dev tunnel host has been disposed."));
+    }
+    if (this.starting) {
+      return this.starting;
+    }
+    if (this.stopping) {
+      return Promise.reject(new Error("Dev tunnel host is still stopping."));
+    }
+    if (this.child) {
+      return Promise.resolve();
+    }
+    const start = new Promise<void>((resolve, reject) => {
+      const child = this.spawnHost(cli, ["host", tunnelId], {
+        shell: false,
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      this.child = child;
+      let spawned = false;
+      const ended = (exit: TunnelHostExit) => {
+        if (this.child !== child) {
+          return;
+        }
+        this.child = undefined;
+        if (!spawned) {
+          reject(new Error("Could not start the background dev tunnel host."));
+        } else if (!this.stopping && !this.disposed) {
+          this.onUnexpectedExit?.(exit);
+        }
+      };
+      child.once("spawn", () => {
+        spawned = true;
+        resolve();
+      });
+      child.on("error", () => {
+        if (!spawned) {
+          ended({ kind: "error" });
+        } else if (!this.stopping && !this.disposed) {
+          this.onUnexpectedExit?.({ kind: "error" });
+        }
+      });
+      child.once("exit", (code, signal) =>
+        ended({ kind: "exit", code, signal }),
+      );
+    });
+    this.starting = start.finally(() => {
+      this.starting = undefined;
+    });
+    return this.starting;
+  }
+
+  stop(): Promise<void> {
+    if (this.stopping) {
+      return this.stopping;
+    }
+    const child = this.child;
+    if (!child) {
+      return Promise.resolve();
+    }
+    // Queue termination so the stopping flag is set before exit/error callbacks.
+    this.stopping = Promise.resolve()
+      .then(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            if (this.child !== child) {
+              resolve();
+              return;
+            }
+            let forced = false;
+            const finish = () => {
+              clearTimeout(timer);
+              child.removeListener("exit", finish);
+              child.removeListener("error", onError);
+              resolve();
+            };
+            const onError = () => {
+              if (this.child !== child) {
+                finish();
+              }
+            };
+            const timer = setInterval(() => {
+              if (!forced) {
+                forced = true;
+                child.kill("SIGKILL");
+              } else {
+                clearInterval(timer);
+                child.removeListener("exit", finish);
+                child.removeListener("error", onError);
+                reject(
+                  new Error("The background dev tunnel host did not stop."),
+                );
+              }
+            }, this.stopTimeoutMs);
+            timer.unref();
+            child.once("exit", finish);
+            child.on("error", onError);
+            child.kill("SIGTERM");
+          }),
+      )
+      .finally(() => {
+        this.stopping = undefined;
+      });
+    return this.stopping;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    void this.stop().catch(() => {
+      this.onUnexpectedExit?.({ kind: "error" });
+    });
+  }
+}
 
 export interface ExecResult {
   code: number;
@@ -299,13 +447,13 @@ export class DevTunnelCli {
     }
     const url = deriveTunnelUrl(tunnelId, port);
     this.log?.warn(
-      `devtunnel show did not report a port URI for ${tunnelId}:${port}; using derived URL ${url} (fallback, may be wrong if the service uses a different host name).`,
+      "devtunnel show did not report a port URI; using a derived URL (fallback, may be wrong if the service uses a different host name).",
     );
     return { tunnelId, url, urlSource: "derived", created, portAdded };
   }
 }
 
-// The ID is later typed into a shell terminal (devtunnel host <id>).
+// Accept only a tunnel ID, never an option or whitespace-separated arguments.
 export const TUNNEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function parseTunnelJson(

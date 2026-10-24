@@ -4,6 +4,7 @@ import { clineAdapter } from "./cline";
 import { codexAdapter } from "./codex";
 import { cursorAdapter } from "./cursor";
 import { deepseekHarnessAdapter } from "./deepseekHarness";
+import { geminiCliAdapter } from "./geminiCli";
 import { kiloAdapter } from "./kilo";
 import { ompAdapter, piAdapter } from "./ompPi";
 import { hermesAdapter, openclawAdapter } from "./openclawHermes";
@@ -12,6 +13,7 @@ import type { ClientAdapter } from "./types";
 export const ALL_CLIENT_ADAPTERS: readonly ClientAdapter[] = [
   codexAdapter,
   claudeCodeAdapter,
+  geminiCliAdapter,
   ompAdapter,
   piAdapter,
   openclawAdapter,

@@ -21,7 +21,7 @@ export interface GatewayConfiguration {
   logLevel: GatewayLogLevel;
   remoteUpstreams: RemoteUpstreamConfig[];
   /** Requested model -> local model ID; an empty value disables a built-in alias. */
-  modelAliases: Record<string, string>;
+  modelMappings: Record<string, string>;
   /** Model for unknown non-Gemini names; empty disables fallback. */
   fallbackModel: string;
   webSearch: {
@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG: GatewayConfiguration = {
   port: 24444,
   logLevel: "info",
   remoteUpstreams: [],
-  modelAliases: { "claude-haiku-5.5": "", "claude-sonnet-5": "" },
+  modelMappings: { "claude-haiku-5.5": "", "claude-sonnet-5": "" },
   fallbackModel: "",
   webSearch: {
     provider: "none",
@@ -71,7 +71,7 @@ export const readConfiguration = (): GatewayConfiguration => {
       "remoteUpstreams",
       DEFAULT_CONFIG.remoteUpstreams,
     ),
-    modelAliases: readModelAliases(config.get<unknown>("modelAliases", {})),
+    modelMappings: readModelAliases(config.get<unknown>("modelMappings", {})),
     fallbackModel: config.get<string>(
       "fallbackModel",
       DEFAULT_CONFIG.fallbackModel,
