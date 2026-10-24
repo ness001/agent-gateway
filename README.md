@@ -12,7 +12,7 @@ Bring the models available in GitHub Copilot to **Claude Code, Codex, Gemini CLI
 [![CI](https://github.com/ness001/agent-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ness001/agent-gateway/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
 
-**[Install for VS Code](https://marketplace.visualstudio.com/items?itemName=ness001.agent-gateway)** · **[Get started](#getting-started)** · **[Supported agents](#supported-agents)** · **[Reference](docs/reference.md)**
+**[Website](https://ness001.github.io/agent-gateway/)** · **[Install for VS Code](https://marketplace.visualstudio.com/items?itemName=ness001.agent-gateway)** · **[Get started](#getting-started)** · **[Supported agents](#supported-agents)** · **[Reference](docs/reference.md)**
 
 </div>
 
