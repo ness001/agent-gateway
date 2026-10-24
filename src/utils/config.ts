@@ -22,7 +22,7 @@ export interface GatewayConfiguration {
   remoteUpstreams: RemoteUpstreamConfig[];
   /** Requested model -> local model ID; an empty value disables a built-in alias. */
   modelAliases: Record<string, string>;
-  /** Model for unknown non-Gemini names; empty uses `gpt-6-astra`. */
+  /** Model for unknown non-Gemini names; empty disables fallback. */
   fallbackModel: string;
   webSearch: {
     provider: WebSearchProviderName;

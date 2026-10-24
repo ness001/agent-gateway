@@ -183,9 +183,7 @@ suite("Gateway app", () => {
   });
 
   test("unknown model errors follow each protocol", async () => {
-    const reg = harness();
-    reg.deps.getRegistry = () => buildRegistry([model("gpt-5")], []);
-    const app = createGatewayApp(reg.deps);
+    const app = createGatewayApp(harness().deps);
     const openai = await app.fetch(post("/v1/responses", { model: "nope" }));
     assert.strictEqual(openai.status, 400);
     assert.strictEqual(
@@ -202,8 +200,9 @@ suite("Gateway app", () => {
     assert.strictEqual(bad.status, 400);
   });
 
-  test("Gemini never falls back; other protocols use the Astra fallback", async () => {
+  test("Gemini never falls back; other protocols use the configured fallback", async () => {
     const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     const app = createGatewayApp(h.deps);
     const gem = await app.fetch(
       post("/v1beta/models/unknown-model:generateContent", {}),
@@ -257,9 +256,10 @@ suite("Gateway app", () => {
     setting = "missing-model";
     for (let i = 0; i < 2; i++) {
       const r = await app.fetch(post("/v1/messages", { model: "other" }));
-      assert.strictEqual(r.status, 200);
+      assert.strictEqual(r.status, 400);
+      assert.strictEqual(r.headers.get("x-agent-gateway-model-fallback"), null);
     }
-    assert.strictEqual((await h.local[2].json()).model, "gpt-6-astra");
+    assert.strictEqual(h.local.length, 1);
     assert.strictEqual(
       h.logs.filter((l) => l.includes('fallbackModel "missing-model"')).length,
       1,
@@ -269,7 +269,7 @@ suite("Gateway app", () => {
     const remote = await app.fetch(post("/v1/messages", { model: "x" }));
     assert.strictEqual(remote.status, 200);
     assert.strictEqual(h.remote.length, 1);
-    assert.strictEqual(h.local.length, 3);
+    assert.strictEqual(h.local.length, 1);
     assert.strictEqual(JSON.parse(h.remote[0].body!).model, "gpt-5-remote");
     assert.strictEqual(
       remote.headers.get("x-agent-gateway-model-fallback"),
@@ -277,8 +277,76 @@ suite("Gateway app", () => {
     );
   });
 
-  test("Gemini CLI internal model names alias to the Astra fallback without a local Gemini model", async () => {
+  test("clearing fallback disables unknown-model and built-in Gemini alias routing", async () => {
     const h = harness();
+    let setting = "gpt-5";
+    h.deps.getFallbackModel = () => setting;
+    const app = createGatewayApp(h.deps);
+    for (const path of [
+      "/v1/messages",
+      "/v1beta/models/gemini-3-flash-preview:generateContent",
+    ]) {
+      setting = "gpt-5";
+      assert.strictEqual(
+        (await app.fetch(post(path, { model: "unknown-model" }))).status,
+        200,
+      );
+      setting = "";
+      const res = await app.fetch(post(path, { model: "unknown-model" }));
+      assert.strictEqual(res.status, path === "/v1/messages" ? 400 : 404);
+      assert.strictEqual(
+        res.headers.get("x-agent-gateway-model-fallback"),
+        null,
+      );
+    }
+    assert.strictEqual(h.local.length, 2);
+  });
+
+  test("an incompatible configured fallback does not use available Astra", async () => {
+    const h = harness();
+    h.deps.getFallbackModel = () => "box--limited";
+    h.deps.getRegistry = () =>
+      buildRegistry(
+        [model("gpt-6-astra")],
+        [
+          {
+            name: "box",
+            models: [{ ...model("limited"), operations: ["openai.responses"] }],
+          },
+        ],
+      );
+    const app = createGatewayApp(h.deps);
+    const res = await app.fetch(post("/v1/messages", { model: "unknown" }));
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(h.local.length, 0);
+    assert.strictEqual(h.remote.length, 0);
+    assert.ok(h.logs.some((l) => l.includes("no fallback will be used")));
+  });
+
+  test("built-in Gemini aliases can use an explicitly configured remote fallback", async () => {
+    const h = harness();
+    h.deps.getFallbackModel = () => "box--gpt-5-remote";
+    const res = await createGatewayApp(h.deps).fetch(
+      post("/v1beta/models/gemini-3-flash-preview:generateContent", {
+        contents: [],
+      }),
+    );
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(h.local.length, 0);
+    assert.strictEqual(h.remote.length, 1);
+    assert.strictEqual(
+      h.remote[0].url,
+      "http://remote.test/v1beta/models/gpt-5-remote:generateContent",
+    );
+    assert.strictEqual(
+      res.headers.get("x-agent-gateway-model-fallback"),
+      "gemini-3-flash-preview -> box--gpt-5-remote; reason=model alias",
+    );
+  });
+
+  test("Gemini CLI internal model names use the configured fallback without a local Gemini model", async () => {
+    const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     const app = createGatewayApp(h.deps);
     const searchBody = {
       contents: [{ role: "user", parts: [{ text: "latest news" }] }],
@@ -420,6 +488,7 @@ suite("Gateway app", () => {
 
   test("model aliases: user override, disable and other protocols", async () => {
     const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     h.deps.getModelAliases = () => ({
       "gemini-3-flash-preview": "gpt-5",
       "gemini-2.5-flash": "",
@@ -471,6 +540,7 @@ suite("Gateway app", () => {
 
   test("the exact Gemini CLI web-fetch request resolves through the alias", async () => {
     const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     const app = createGatewayApp(h.deps);
     // Shape sent by Gemini CLI 0.32.1 web_fetch (model config 'web-fetch').
     const body = {
@@ -576,6 +646,7 @@ suite("Gateway app", () => {
 
   test("fallback reasons for remote-prefixed IDs are logged and in headers", async () => {
     const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     h.deps.getRemoteStates = () => [
       {
         name: "box",
@@ -609,6 +680,7 @@ suite("Gateway app", () => {
 
   test("fallback header strips CR/LF and non-ASCII from the requested ID", async () => {
     const h = harness();
+    h.deps.getFallbackModel = () => "gpt-6-astra";
     const app = createGatewayApp(h.deps);
     const res = await app.fetch(
       post("/v1/messages", { model: "evil\r\nSet-Cookie: a=bé" }),

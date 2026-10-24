@@ -23,7 +23,7 @@ export interface HealthSnapshot {
   remotes: RemoteState[];
   /** Model used for unknown non-Gemini model names; null when none. */
   fallbackModel: string | null;
-  fallbackModelSource: "setting" | "default" | null;
+  fallbackModelSource: "setting" | null;
   /** Metadata-only failures since the gateway was activated. */
   errors: { counts: Record<string, number>; recent: ErrorRecord[] };
 }

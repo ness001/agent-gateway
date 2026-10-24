@@ -128,7 +128,7 @@
         "agentGateway.webSearch.model": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Model for Gemini hosted-search side requests whose requested model does not exist (Gemini CLI's `google_web_search` asks for its own internal model). Empty uses the model aliases: the best local Gemini Flash model, else the Astra fallback."
+          "markdownDescription": "Model for Gemini hosted-search side requests whose requested model does not exist (Gemini CLI's `google_web_search` asks for its own internal model). Empty uses the model aliases: the best local Gemini Flash model, else the explicitly selected fallback model, if configured."
         },
         "agentGateway.modelAliases": {
           "type": "object",
@@ -144,7 +144,7 @@
         "agentGateway.fallbackModel": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Local or remote upstream model used when an agent requests an unknown model name (Gemini requests excepted). Remote IDs use `{name}--{modelId}`. Empty: local `gpt-6-astra` if available, otherwise the request fails. If the model named here is not available, `gpt-6-astra` is used instead. A matching `agentGateway.modelAliases` entry takes precedence. **Status** shows the fallback model in use."
+          "markdownDescription": "Local or remote upstream model used when an agent requests an unknown model name (Gemini requests excepted). Remote IDs use `{name}--{modelId}`. Empty disables fallback. No model is selected automatically. If the selected model is unavailable or does not support the requested API, the request fails. A matching `agentGateway.modelAliases` entry takes precedence. **Status** shows the fallback model in use."
         },
         "agentGateway.webSearch.maxSearchesPerRequest": {
           "type": "integer",

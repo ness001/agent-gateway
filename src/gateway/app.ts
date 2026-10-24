@@ -70,7 +70,7 @@ export interface GatewayAppDeps {
   getWebSearchModel?: () => string | undefined;
   /** `agentGateway.modelAliases` (requested model -> local model). */
   getModelAliases?: () => Record<string, unknown> | undefined;
-  /** `agentGateway.fallbackModel`; empty uses `gpt-6-astra`. */
+  /** `agentGateway.fallbackModel`; empty disables fallback. */
   getFallbackModel?: () => string | undefined;
 }
 
@@ -518,7 +518,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       if (!warnedFallbacks.has(id)) {
         warnedFallbacks.add(id);
         deps.logger.warn(
-          `agentGateway.fallbackModel ${logId(id)} is not an available model; using the default fallback.`,
+          `agentGateway.fallbackModel ${logId(id)} is not an available model for this operation; no fallback will be used.`,
         );
       }
     },

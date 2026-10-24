@@ -1,12 +1,5 @@
 import type { CatalogEntry, ProtocolOperation, RemoteState } from "./types";
 
-export const ASTRA_FALLBACK_IDS = [
-  "gpt-6-astra",
-  "gateway-claude-gpt-6-astra",
-  "gpt-6-astra[1m]",
-  "gateway-claude-gpt-6-astra[1m]",
-];
-
 const isBlank = (s: string): boolean => s.trim() === "";
 
 /**
@@ -69,7 +62,7 @@ export interface ResolvedModel {
 }
 
 export interface FallbackOptions {
-  /** `agentGateway.fallbackModel`; empty uses the default. */
+  /** `agentGateway.fallbackModel`; empty disables fallback. */
   fallbackModel?: string;
   /** Only models serving this operation are chosen when set. */
   operation?: ProtocolOperation;
@@ -83,12 +76,12 @@ type FallbackCandidate = Pick<CatalogEntry, "id" | "remote"> & {
 
 export interface FallbackChoice<T extends FallbackCandidate = CatalogEntry> {
   entry: T;
-  source: "setting" | "default";
+  source: "setting";
 }
 
 /**
  * The unknown-model fallback: `agentGateway.fallbackModel` when it names a
- * local or remote model, else local `gpt-6-astra`, else none.
+ * usable local or remote model, else none.
  */
 export function resolveFallbackModel<T extends FallbackCandidate>(
   reg: T[],
@@ -110,11 +103,7 @@ export function resolveFallbackModel<T extends FallbackCandidate>(
     }
     opts.onMissingFallback?.(configured);
   }
-  const astra = firstPresent(
-    candidates.filter((e) => e.remote === undefined),
-    ASTRA_FALLBACK_IDS,
-  );
-  return astra ? { entry: astra, source: "default" } : undefined;
+  return undefined;
 }
 
 export function resolveModel(
