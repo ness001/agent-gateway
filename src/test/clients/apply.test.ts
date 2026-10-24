@@ -91,6 +91,7 @@ suite("clients/apply", () => {
       [
         "codex",
         "claude-code",
+        "gemini-cli",
         "omp",
         "pi",
         "openclaw",

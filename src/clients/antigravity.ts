@@ -90,7 +90,7 @@ export const antigravityAdapter: ClientAdapter = {
       ],
       manualSteps: [
         `Set these environment variables, then open a new terminal: ${env.join(" ; ")}`,
-        `Run agy and pick a Gemini model with /model or --model. If the gateway has no model of that name, map it with agentGateway.modelAliases (for example {"gemini-3.8-flash": "${input.defaultModel}"}).`,
+        `Run agy and pick a Gemini model with /model or --model. If the gateway has no model of that name, map it with agentGateway.modelMappings (for example {"gemini-3.8-flash": "${input.defaultModel}"}).`,
       ],
       clipboard: [...env, ""].join("\n"),
       afterApply: "Open a new terminal and run agy.",

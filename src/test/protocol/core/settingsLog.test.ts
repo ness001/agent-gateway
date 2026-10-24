@@ -6,6 +6,7 @@ import {
   formatSettingsLine,
   logRequestSettings,
   settingsFromRequest,
+  settingsFromWire,
 } from "../../../protocol/core/settingsLog";
 import type { CoreRequest } from "../../../protocol/core/types";
 import { CollectSink } from "../../../protocol/http/sink";
@@ -130,6 +131,56 @@ suite("protocol/core/settingsLog", () => {
     }
     assert.ok(m.includes('model="redacted"'));
     assert.ok(m.includes("reasoning=redacted"));
+  });
+
+  test("wire metadata accepts only finite scalars and fixed-safe settings", () => {
+    const body = {
+      max_output_tokens: Infinity,
+      temperature: { value: "SECRET" },
+      top_p: NaN,
+      stop: ["SECRET STOP"],
+      reasoning: { effort: "SECRET" },
+      tool_choice: { type: "SECRET", name: "SECRET TOOL" },
+      tools: [
+        { type: "SECRET" },
+        { type: "https://secret.test" },
+        { type: "web_search" },
+      ],
+      prompt_cache_key: "SECRET CACHE",
+      parallel_tool_calls: "SECRET",
+      stream: "SECRET",
+    };
+    const line = formatSettingsLine(
+      { ...meta, protocol: "openai-responses", remote: "box" },
+      settingsFromWire("openai-responses", body),
+    );
+    assert.ok(line.includes("max_tokens=none"));
+    assert.ok(line.includes("reasoning=redacted"));
+    assert.ok(line.includes("tool_choice=auto"));
+    assert.ok(line.includes("hosted=web_search"));
+    assert.ok(line.includes("tools=2"));
+    assert.ok(line.includes("cache_key=yes"));
+    for (const bad of [
+      "SECRET",
+      "secret",
+      "Infinity",
+      "NaN",
+      "temperature=",
+      "top_p=",
+      "parallel_tool_calls=",
+    ]) {
+      assert.ok(!line.includes(bad), `${bad}: ${line}`);
+    }
+    for (const value of [
+      null,
+      false,
+      1,
+      "SECRET",
+      [],
+      { tools: [null, false, "SECRET"], generationConfig: [] },
+    ]) {
+      assert.doesNotThrow(() => settingsFromWire("gemini", value));
+    }
   });
 
   test("runTurn logs exactly one settings line with resolved model", async () => {

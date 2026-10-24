@@ -64,6 +64,13 @@ client must send it as a bearer token, `x-api-key` or `x-goog-api-key`.
 
 ### Files written by Configure Coding Agents
 
+Gemini CLI setup writes the gateway URL, key and selected model in `~/.gemini/.env`,
+selects API-key authentication in `~/.gemini/settings.json`, and records prior
+values in `~/.gemini/agent-gateway.json` for undo. `GEMINI_CLI_HOME` overrides the
+home directory. Existing process variables, a nearer project `.env`, workspace
+settings or `--model` can take precedence. Restart Gemini CLI after configuring.
+This adapter has focused configuration tests but is not yet verified live.
+
 | Agent            | File                                                                                                                            | Models             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | Codex            | `~/.codex/config.toml`                                                                                                          | discovered         |
@@ -126,13 +133,16 @@ require a lower value after configuration; rerunning Configure resets it to
 
 A request for an unknown model falls back to the fallback model (logged as a
 warning and reported in the `x-agent-gateway-model-fallback` header). The
-fallback model is `agentGateway.fallbackModel` if it names a model in your
-list, else `gpt-6-astra` if your list has it; otherwise the request fails.
-A setting that names a missing model logs a warning. Remote models are never
-used as the fallback. Gemini requests do not fall back, except through
-aliases. **Status** and `/health` (`fallbackModel`) show the model in use.
+fallback model is `agentGateway.fallbackModel` if it names an available local
+or remote model that supports the requested API; otherwise the request fails.
+No model is selected automatically. Use **Set Fallback Model** to choose one,
+or **No fallback** to disable it. Remote IDs use `{name}--{modelId}`.
+A setting that names a missing or incompatible model logs a warning; it does
+not select a different model. Errors from an existing model do not trigger fallback.
+Gemini requests do not fall back, except through aliases. **Status** and `/health`
+(`fallbackModel`) show the model in use.
 
-`agentGateway.modelAliases` maps a requested name to one of your models for
+`agentGateway.modelMappings` maps a requested name to one of your models for
 every API, for example `{"my-model": "gpt-5.6-sol"}`. Built-in aliases cover
 Gemini CLI's internal model names (`gemini-3-flash-preview`,
 `gemini-2.5-flash`, `gemini-2.5-flash-lite` and Antigravity CLI's
@@ -233,7 +243,10 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   (`[<id>] <protocol> <method> <path> model=... status=... <ms>`), one line
   with the settings sent to the model (output limit, reasoning, tool count,
   whether a cache key was present), warnings for repaired tool-call history,
-  fallbacks and client disconnects. `debug` adds provider error messages.
+  fallbacks and client disconnects. Remote settings and summaries start with
+  `[remote][<upstream-name>]`. Settings describe forwarded metadata, not what
+  the remote model applied; no prompt, stop text or cache-key value is included.
+  `debug` adds provider error messages.
 - **Status** > **Change log level**: select `error`, `warn`, `info`, or `debug`.
   Applies immediately without restarting; updates an existing workspace override,
   otherwise your user setting. For debug output, also select Debug for the

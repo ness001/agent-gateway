@@ -297,7 +297,7 @@ suite("Gateway catalogue", () => {
         ].map((id) => m(id)),
         [],
       );
-      const lines = summarizeModels(reg);
+      const lines = summarizeModels(reg, "gpt-6-astra");
       assert.strictEqual(lines[0], "Available models: 6 model IDs, 6 aliases");
       for (const h of [
         "GPT (2):",
@@ -331,7 +331,7 @@ suite("Gateway catalogue", () => {
         "Available models: 1 model IDs, 0 aliases",
         "Other (1):",
         '  "auto"',
-        "Unknown-model fallback: unavailable",
+        "Unknown-model fallback: none",
       ]);
     });
 
@@ -341,13 +341,17 @@ suite("Gateway catalogue", () => {
         { id: "gpt-6-astra", upstreamModelId: "gpt-6-astra" },
       ];
       assert.strictEqual(
+        summarizeModels(reg).at(-1),
+        "Unknown-model fallback: none",
+      );
+      assert.strictEqual(
         summarizeModels(reg, "gpt-5").at(-1),
         'Unknown-model fallback (non-Gemini): "gpt-5"',
       );
       const lines = summarizeModels(reg, "nope");
       assert.deepStrictEqual(lines.slice(-2), [
-        'agentGateway.fallbackModel "nope" is not an available local model; using the default fallback.',
-        'Unknown-model fallback (non-Gemini): "gpt-6-astra"',
+        'agentGateway.fallbackModel "nope" is not an available model; no fallback will be used.',
+        "Unknown-model fallback: none",
       ]);
     });
 
@@ -363,16 +367,20 @@ suite("Gateway catalogue", () => {
       assert.ok(lines.includes('  "alias" -> ' + JSON.stringify(unsafe)));
     });
 
-    test("groups by upstream identity and never advertises a remote fallback", () => {
+    test("groups by upstream identity and requires an explicit remote fallback", () => {
       const reg = buildRegistry(
         [],
         [{ name: "devbox", models: [m("gpt-6-astra")] }],
+      );
+      assert.strictEqual(
+        summarizeModels(reg, "devbox--gpt-6-astra").at(-1),
+        'Unknown-model fallback (non-Gemini): "devbox--gpt-6-astra"',
       );
       const lines = summarizeModels(reg);
       assert.ok(lines.includes("GPT (1):"));
       assert.strictEqual(
         lines[lines.length - 1],
-        "Unknown-model fallback: unavailable",
+        "Unknown-model fallback: none",
       );
     });
   });

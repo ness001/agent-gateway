@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 
+import {
+  logRequestSettings,
+  settingsFromWire,
+} from "../protocol/core/settingsLog";
 import { attachParsedBody, lazyBody } from "../protocol/http/body";
 import {
   createCodexModelsResponse,
@@ -68,9 +72,9 @@ export interface GatewayAppDeps {
   fetchImpl?: typeof fetch;
   /** `agentGateway.webSearch.model`; empty picks a local Gemini model. */
   getWebSearchModel?: () => string | undefined;
-  /** `agentGateway.modelAliases` (requested model -> local model). */
+  /** `agentGateway.modelMappings` (requested model -> local model). */
   getModelAliases?: () => Record<string, unknown> | undefined;
-  /** `agentGateway.fallbackModel`; empty uses `gpt-6-astra`. */
+  /** `agentGateway.fallbackModel`; empty disables fallback. */
   getFallbackModel?: () => string | undefined;
 }
 
@@ -291,7 +295,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
     const elapsedMs = Date.now() - started;
     const status = c.res.status;
     deps.logger.info(
-      `[${id}] ${protocol} ${c.req.method} ${c.req.path}${
+      `${context.remote !== undefined ? `[remote][${/^[A-Za-z0-9._-]{1,128}$/.test(context.remote) ? context.remote : "redacted"}] ` : ""}[${id}] ${protocol} ${c.req.method} ${c.req.path}${
         selected ? ` model=${logId(selected)}` : ""
       } status=${status}${context.errorKind ? ` kind=${context.errorKind}` : ""} ${elapsedMs}ms`,
     );
@@ -518,7 +522,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       if (!warnedFallbacks.has(id)) {
         warnedFallbacks.add(id);
         deps.logger.warn(
-          `agentGateway.fallbackModel ${logId(id)} is not an available local model; using the default fallback.`,
+          `agentGateway.fallbackModel ${logId(id)} is not an available model for this operation; no fallback will be used.`,
         );
       }
     },
@@ -616,6 +620,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
     const context = currentRequestContext();
     if (context) {
       context.model = entry.id;
+      context.remote = entry.remote;
     }
     const operation = gemini
       ? (`gemini.${gemini.action}` as ProtocolOperation)
@@ -651,6 +656,44 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       const reqId = c.get("requestId" as never) as string;
       if (context) {
         context.remote = remote.name;
+      }
+      if (
+        operation !== "anthropic.countTokens" &&
+        operation !== "gemini.countTokens"
+      ) {
+        // Metadata is best-effort and must never block transparent forwarding.
+        try {
+          const wireProtocol =
+            protocol === "openai"
+              ? operation === "openai.responses"
+                ? "openai-responses"
+                : "openai-chat"
+              : protocol === "gemini"
+                ? "gemini"
+                : "anthropic";
+          const requestedModel = gemini
+            ? decodeURIComponent(GEMINI_PATH.exec(url.pathname)![1])
+            : typeof body?.model === "string"
+              ? body.model
+              : entry.id;
+          logRequestSettings(
+            deps.logger,
+            {
+              requestId: reqId,
+              protocol: wireProtocol,
+              requestedModel,
+              resolvedModel: entry.upstreamModelId,
+              remote: remote.name,
+            },
+            settingsFromWire(
+              wireProtocol,
+              gemini ? geminiBody : body,
+              gemini?.action,
+            ),
+          );
+        } catch {
+          // Logging does not change which payload or response reaches the caller.
+        }
       }
       try {
         const response = await forwardToRemote({

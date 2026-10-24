@@ -1,11 +1,14 @@
 import * as assert from "assert";
+import { ChildProcess } from "node:child_process";
 
 import {
   DevTunnelCli,
   DevTunnelError,
+  DevTunnelHost,
   type ExecFn,
   type ExecResult,
   TUNNEL_ID_PATTERN,
+  type TunnelHostExit,
   clientSetupText,
   deriveTunnelUrl,
   findDevTunnelCli,
@@ -264,6 +267,128 @@ suite("devTunnel", () => {
     assert.match(text, /Name: My-PC-1/);
     assert.match(text, /URL: https:\/\/x-1\.jpe1\.devtunnels\.ms/);
     assert.match(text, /Manage Remote Upstreams/);
+  });
+});
+
+suite("devTunnel background host", () => {
+  test("spawns without a shell or terminal and coalesces starts", async () => {
+    const child = new ChildProcess();
+    let calls = 0;
+    const host = new DevTunnelHost((file, args, options) => {
+      calls++;
+      assert.strictEqual(file, "/cli path/devtunnel");
+      assert.deepStrictEqual(args, ["host", "t.jpe1"]);
+      assert.deepStrictEqual(options, {
+        shell: false,
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      return child;
+    });
+    const first = host.start("/cli path/devtunnel", "t.jpe1");
+    assert.strictEqual(first, host.start("ignored", "other.jpe1"));
+    assert.strictEqual(host.active, true);
+    child.emit("spawn");
+    await first;
+    await host.start("ignored", "other.jpe1");
+    assert.strictEqual(calls, 1);
+    child.emit("exit", 0, null);
+    assert.strictEqual(host.active, false);
+  });
+
+  test("spawn failures clear state without exposing CLI output", async () => {
+    const child = new ChildProcess();
+    const host = new DevTunnelHost(() => child);
+    const started = host.start("devtunnel", "t.jpe1");
+    child.emit("error", new Error("private CLI output"));
+    await assert.rejects(started, (error: Error) => {
+      assert.strictEqual(
+        error.message,
+        "Could not start the background dev tunnel host.",
+      );
+      return true;
+    });
+    assert.strictEqual(host.active, false);
+  });
+
+  test("unexpected exit reports only fixed process metadata and permits restart", async () => {
+    const exits: TunnelHostExit[] = [];
+    let child = new ChildProcess();
+    const host = new DevTunnelHost(
+      () => child,
+      (exit) => exits.push(exit),
+    );
+    let started = host.start("devtunnel", "t.jpe1");
+    child.emit("spawn");
+    await started;
+    child.emit("exit", 3, null);
+    assert.strictEqual(host.active, false);
+    assert.deepStrictEqual(exits, [{ kind: "exit", code: 3, signal: null }]);
+    child = new ChildProcess();
+    started = host.start("devtunnel", "t.jpe1");
+    child.emit("spawn");
+    await started;
+    child.emit("exit", 0, null);
+  });
+
+  test("stop awaits exit and suppresses unexpected-exit notifications", async () => {
+    const child = new ChildProcess();
+    const signals: (NodeJS.Signals | number | undefined)[] = [];
+    child.kill = (signal) => {
+      signals.push(signal);
+      return true;
+    };
+    const exits: TunnelHostExit[] = [];
+    const host = new DevTunnelHost(
+      () => child,
+      (exit) => exits.push(exit),
+    );
+    const started = host.start("devtunnel", "t.jpe1");
+    child.emit("spawn");
+    await started;
+    const stopped = host.stop();
+    assert.strictEqual(stopped, host.stop());
+    await Promise.resolve();
+    assert.deepStrictEqual(signals, ["SIGTERM"]);
+    assert.strictEqual(host.active, true);
+    child.emit("exit", null, "SIGTERM");
+    await stopped;
+    assert.strictEqual(host.active, false);
+    assert.deepStrictEqual(exits, []);
+  });
+
+  test("dispose force-kills an unresponsive host within a bounded delay", async () => {
+    const child = new ChildProcess();
+    const signals: (NodeJS.Signals | number | undefined)[] = [];
+    child.kill = (signal) => {
+      signals.push(signal);
+      if (signal === "SIGKILL") {
+        child.emit("exit", null, "SIGKILL");
+      }
+      return true;
+    };
+    const host = new DevTunnelHost(() => child, undefined, 5);
+    const started = host.start("devtunnel", "t.jpe1");
+    child.emit("spawn");
+    await started;
+    host.dispose();
+    await host.stop();
+    assert.deepStrictEqual(signals, ["SIGTERM", "SIGKILL"]);
+    assert.strictEqual(host.active, false);
+    await assert.rejects(host.start("devtunnel", "t.jpe1"), /disposed/);
+  });
+
+  test("failed forced stop retains active state and reports failure", async () => {
+    const child = new ChildProcess();
+    child.kill = () => false;
+    const host = new DevTunnelHost(() => child, undefined, 5);
+    const started = host.start("devtunnel", "t.jpe1");
+    child.emit("spawn");
+    await started;
+    await assert.rejects(host.stop(), /did not stop/);
+    assert.strictEqual(host.active, true);
+    child.emit("exit", 0, null);
+    assert.strictEqual(host.active, false);
   });
 });
 

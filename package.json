@@ -2,7 +2,7 @@
   "name": "agent-gateway",
   "displayName": "Agent Gateway",
   "description": "Use your GitHub Copilot models in any agent through one local gateway, share them across machines, and enable web search, compatible with all tool calls. Works with Claude Code, Codex, Gemini CLI, Antigravity CLI, Kilo Code, Cline, DeepSeek Harness, Pi, Oh My Pi, Hermes and OpenClaw.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "ness001",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -128,10 +128,11 @@
         "agentGateway.webSearch.model": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Model for Gemini hosted-search side requests whose requested model does not exist (Gemini CLI's `google_web_search` asks for its own internal model). Empty uses the model aliases: the best local Gemini Flash model, else the Astra fallback."
+          "markdownDescription": "Model for Gemini hosted-search side requests whose requested model does not exist (Gemini CLI's `google_web_search` asks for its own internal model). Empty uses the model mappings: the best local Gemini Flash model, else the explicitly selected fallback model, if configured."
         },
-        "agentGateway.modelAliases": {
+        "agentGateway.modelMappings": {
           "type": "object",
+          "title": "Model Mappings",
           "default": {
             "claude-haiku-5.5": "",
             "claude-sonnet-5": ""
@@ -139,12 +140,12 @@
           "additionalProperties": {
             "type": "string"
           },
-          "markdownDescription": "Requested model -> local model ID, for every protocol. Built-in defaults map the internal names of Gemini CLI and Antigravity CLI (`gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-3.1-flash-lite-preview` -> best local Gemini Flash model; `gemini-3-pro-preview`, `gemini-2.5-pro` -> best local Gemini Pro model; else the fallback model) when that name has no route. An empty string disables a default. Substitutions are logged and reported in the `x-agent-gateway-model-fallback` header; aliases are not listed in `/v1/models`."
+          "markdownDescription": "Model mappings: requested model name -> local model ID, for every protocol. This routes a requested name to another model; it does not select the agent's main model. Built-in defaults map the internal names of Gemini CLI and Antigravity CLI (`gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-3.1-flash-lite-preview` -> best local Gemini Flash model; `gemini-3-pro-preview`, `gemini-2.5-pro` -> best local Gemini Pro model; else the fallback model) when that name has no route. An empty string disables a default. Substitutions are logged and reported in the `x-agent-gateway-model-fallback` header; aliases are not listed in `/v1/models`."
         },
         "agentGateway.fallbackModel": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Model used when an agent requests a model name your Copilot account doesn't offer (Gemini requests excepted). Empty: `gpt-6-astra` if your model list has it, otherwise the request fails. If the model named here is not available, `gpt-6-astra` is used instead. A matching `agentGateway.modelAliases` entry takes precedence. **Status** shows the fallback model in use."
+          "markdownDescription": "Local or remote upstream model used when an agent requests an unknown model name (Gemini requests excepted). Remote IDs use `{name}--{modelId}`. Empty disables fallback. No model is selected automatically. If the selected model is unavailable or does not support the requested API, the request fails. A matching `agentGateway.modelMappings` entry takes precedence. **Status** shows the fallback model in use."
         },
         "agentGateway.webSearch.maxSearchesPerRequest": {
           "type": "integer",
