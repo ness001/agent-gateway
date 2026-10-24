@@ -313,7 +313,7 @@
     "@vscode/vsce": "^3.7.0",
     "esbuild": "^0.25.3",
     "eslint": "^9.25.1",
-    "prettier": "3.5.3",
+    "prettier": "3.9.10",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3"
   }
