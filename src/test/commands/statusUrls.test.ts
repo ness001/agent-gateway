@@ -5,6 +5,7 @@ import {
   DevTunnelConnection,
   type DevTunnelSharingState,
   devTunnelSharingState,
+  shareActionItems,
   shareViaDevTunnel,
 } from "../../commands/share";
 import { showStatus, statusItems } from "../../commands/status";
@@ -44,6 +45,10 @@ suite("commands/status sharing", () => {
       [
         { status: "checkFailed", reason: "HTTP 403" },
         "Connection check failed",
+      ],
+      [
+        { status: "stopFailed", url: "https://example.test" },
+        "Stop failed (still sharing)",
       ],
     ];
     for (const [state, label] of states) {
@@ -157,6 +162,91 @@ suite("commands/status sharing", () => {
     releaseStopped(Response.json({ version: 1, models: [] }));
     assert.strictEqual(await stopped, false);
     assert.deepStrictEqual(connection.state, { status: "inactive" });
+  });
+
+  test("failed stop keeps a live host manageable and ignores its pending catalog check", async () => {
+    const connection = new DevTunnelConnection();
+    const url = "https://example.test";
+    let release!: (response: Response) => void;
+    const checking = connection.check(url, undefined, {
+      fetchImpl: () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    });
+    let rejectStop!: (error: Error) => void;
+    const host = {
+      active: true,
+      stop: () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectStop = reject;
+        }),
+    };
+    const stopping = connection.stop(host);
+    release(Response.json({ version: 1, models: [] }));
+    assert.strictEqual(await checking, false);
+    const error = new Error("Host is still running");
+    rejectStop(error);
+    await assert.rejects(stopping, error);
+    assert.strictEqual(host.active, true);
+    assert.deepStrictEqual(connection.state, { status: "stopFailed", url });
+    assert.deepStrictEqual(
+      shareActionItems(connection.state.url, true).map((item) => item.id),
+      ["copyUrl", "copySetup", "stop", "setKey", "removeKey"],
+    );
+    assert.strictEqual(
+      statusItems(health(), "info", connection.state).find(
+        (item) => item.action === "share",
+      )?.label,
+      "$(radio-tower) Manage sharing via dev tunnel",
+    );
+  });
+
+  test("successful stop clears sharing and ignores late catalog completion", async () => {
+    const connection = new DevTunnelConnection();
+    let release!: (response: Response) => void;
+    const checking = connection.check("https://example.test", undefined, {
+      fetchImpl: () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    });
+    const host = {
+      active: true,
+      stop: async () => {
+        host.active = false;
+      },
+    };
+    await connection.stop(host);
+    assert.strictEqual(host.active, false);
+    assert.deepStrictEqual(connection.state, { status: "inactive" });
+    release(Response.json({ version: 1, models: [] }));
+    assert.strictEqual(await checking, false);
+    assert.deepStrictEqual(connection.state, { status: "inactive" });
+  });
+
+  test("failed stop cannot be revived by a late catalog completion", async () => {
+    const connection = new DevTunnelConnection();
+    const url = "https://example.test";
+    let release!: (response: Response) => void;
+    const checking = connection.check(url, undefined, {
+      fetchImpl: () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    });
+    await assert.rejects(
+      connection.stop({
+        active: true,
+        stop: async () => {
+          throw new Error("Host is still running");
+        },
+      }),
+      /Host is still running/,
+    );
+    release(Response.json({ version: 1, models: [] }));
+    assert.strictEqual(await checking, false);
+    assert.deepStrictEqual(connection.state, { status: "stopFailed", url });
   });
 
   test("selecting sharing dispatches the supplied sharing handler", async () => {
