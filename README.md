@@ -123,6 +123,10 @@ key, and starts a tunnel whose URL stays the same across runs. Hosting runs in
 an extension-managed background process, not an integrated terminal. Use **Copy
 client setup** to send the URL (the key is never included).
 
+The gateway checks the public connection automatically. **Status** shows
+**Connecting**, then **Connected** with the discovered model count, or the
+connection-check failure. You can start, manage or stop sharing from **Status**.
+
 Run **Share Gateway via Dev Tunnel** again and choose **Stop sharing** to stop
 hosting. Hosting also stops when the extension shuts down. Installation and
 sign-in may still open a terminal for interactive steps.

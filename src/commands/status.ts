@@ -7,6 +7,11 @@ import { CONFIG_SECTION, type GatewayLogLevel } from "../utils/config";
 import { logger } from "../utils/logger";
 import { changeLogLevel } from "./logLevel";
 import { remoteStateText } from "./remotes";
+import {
+  type DevTunnelSharingState,
+  devTunnelSharingState,
+  devTunnelSharingText,
+} from "./share";
 
 export const RECENT_ERRORS_SHOWN = 5;
 
@@ -14,12 +19,14 @@ export type StatusAction =
   | "restart"
   | "changePort"
   | "fallbackModel"
+  | "models"
   | "copyHealth"
   | "openErrorLog"
   | "showLog"
   | "logLevel"
   | "setApiKey"
   | "remotes"
+  | "share"
   | "webSearch"
   | "clients";
 
@@ -99,6 +106,7 @@ const ACTIONS: [StatusAction, string, string?][] = [
   ["logLevel", "$(settings-gear) Change log level"],
   ["setApiKey", "$(key) Set gateway API key"],
   ["remotes", "$(remote) Manage remote upstreams"],
+  ["share", "$(radio-tower) Start sharing via dev tunnel"],
   ["webSearch", "$(search) Web search and fetch"],
   ["clients", "$(gear) Configure coding agents"],
 ];
@@ -107,12 +115,28 @@ const ACTIONS: [StatusAction, string, string?][] = [
 export function statusItems(
   h: HealthSnapshot,
   logLevel: GatewayLogLevel = "info",
+  sharing: DevTunnelSharingState = devTunnelSharingState(),
 ): StatusItem[] {
   const recent = h.errors.recent.slice(0, RECENT_ERRORS_SHOWN);
   return [
     { label: `Status: ${h.status}` },
     { label: `Listener: ${h.listener.address ?? "inactive"}` },
-    { label: `Models: ${h.modelCount}` },
+    {
+      label: `Dev tunnel sharing: ${devTunnelSharingText(sharing)}`,
+      description: sharing.url,
+      detail:
+        sharing.status === "connected"
+          ? "Last connection check succeeded."
+          : sharing.status === "checkFailed"
+            ? sharing.reason
+            : undefined,
+    },
+    {
+      label: `Models: ${h.modelCount}`,
+      detail:
+        "Browse discovered local and remote models; select to copy a model ID.",
+      action: "models",
+    },
     h.fallbackModel
       ? {
           label: `Fallback model: ${h.fallbackModel}`,
@@ -143,8 +167,16 @@ export function statusItems(
     ...apiUrlItems(h),
     { label: "Actions", separator: true },
     ...ACTIONS.map(([action, label, description]) => ({
-      label,
-      description: action === "logLevel" ? `Current: ${logLevel}` : description,
+      label:
+        action === "share" && sharing.status !== "inactive"
+          ? "$(radio-tower) Manage sharing via dev tunnel"
+          : label,
+      description:
+        action === "logLevel"
+          ? `Current: ${logLevel}`
+          : action === "share" && sharing.status !== "inactive"
+            ? devTunnelSharingText(sharing)
+            : description,
       action,
     })),
   ];
@@ -178,17 +210,48 @@ export async function copyHealth(gw: Gateway): Promise<void> {
   void vscode.window.showInformationMessage("Gateway health copied.");
 }
 
+async function showModels(gw: Gateway): Promise<void> {
+  const models = gw.nativeModels();
+  if (models.length === 0) {
+    void vscode.window.showInformationMessage("No models discovered yet.");
+    return;
+  }
+  const picked = await vscode.window.showQuickPick(
+    models
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((model) => ({
+        label: model.id,
+        description: model.remote ? `Remote: ${model.remote}` : "Local",
+        detail: model.displayName,
+      })),
+    {
+      title: `Discovered models (${models.length}) — select to copy a model ID`,
+      matchOnDescription: true,
+      matchOnDetail: true,
+    },
+  );
+  if (picked) {
+    await vscode.env.clipboard.writeText(picked.label);
+    void vscode.window.showInformationMessage(
+      `Model ID copied: ${picked.label}`,
+    );
+  }
+}
+
 export async function showStatus(
   gw: Gateway,
   run: Record<
-    Exclude<StatusAction, "showLog" | "logLevel">,
+    Exclude<StatusAction, "showLog" | "logLevel" | "models">,
     () => Thenable<unknown>
   >,
 ): Promise<void> {
   const level = vscode.workspace
     .getConfiguration(CONFIG_SECTION)
     .get<GatewayLogLevel>("logLevel", "info");
-  const items = statusItems(gw.health(), level).map((i) => ({
+  const items = statusItems(
+    { ...gw.health(), modelCount: gw.nativeModels().length },
+    level,
+  ).map((i) => ({
     ...i,
     kind: i.separator ? vscode.QuickPickItemKind.Separator : undefined,
   }));
@@ -201,6 +264,10 @@ export async function showStatus(
     return;
   }
   if (!picked?.action) {
+    return;
+  }
+  if (picked.action === "models") {
+    await showModels(gw);
     return;
   }
   if (picked.action === "showLog") {
