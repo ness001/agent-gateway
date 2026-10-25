@@ -113,7 +113,13 @@ export async function hiddenSetApiKey(
 }
 
 export interface DevTunnelSharingState {
-  status: "inactive" | "starting" | "connecting" | "connected" | "checkFailed";
+  status:
+    | "inactive"
+    | "starting"
+    | "connecting"
+    | "connected"
+    | "checkFailed"
+    | "stopFailed";
   url?: string;
   modelCount?: number;
   reason?: string;
@@ -131,6 +137,24 @@ export class DevTunnelConnection {
   reset(): void {
     this.session++;
     this.current = { status: "inactive" };
+  }
+
+  async stop(host: Pick<DevTunnelHost, "active" | "stop">): Promise<void> {
+    const session = ++this.session;
+    const url = this.current.url;
+    try {
+      await host.stop();
+      if (session === this.session) {
+        this.reset();
+      }
+    } catch (error) {
+      if (session === this.session) {
+        this.current = host.active
+          ? { status: "stopFailed", url }
+          : { status: "inactive" };
+      }
+      throw error;
+    }
   }
 
   async check(
@@ -174,6 +198,8 @@ export function devTunnelSharingText(state: DevTunnelSharingState): string {
       return `Connected (${state.modelCount} models)`;
     case "checkFailed":
       return "Connection check failed";
+    case "stopFailed":
+      return "Stop failed (still sharing)";
   }
 }
 
@@ -286,10 +312,9 @@ export async function shareViaDevTunnel(
       );
       return;
     case "stop":
-      connection.reset();
       startingShare = undefined;
       try {
-        await host.stop();
+        await connection.stop(host);
         logger.info("Stopped sharing the gateway via dev tunnel.");
         void vscode.window.showInformationMessage(
           "Stopped sharing. The tunnel is kept and reused next time.",
