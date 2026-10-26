@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4
+
+- Start and manage dev tunnel sharing directly from **Status**.
+- Automatically check the public connection after starting a tunnel; show
+  **Connecting**, **Connected** with the model count, or a clear failure reason.
+- Click **Models** in **Status** to search discovered local and remote models
+  and copy a model ID. The count includes both local and remote models.
+- Add a product landing page linked from the README and repository homepage.
+
 ## 0.1.3
 
 - Choose local or remote upstream models in **Set Fallback Model**. No model is

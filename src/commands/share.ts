@@ -10,7 +10,9 @@ import {
   clientSetupText,
   findDevTunnelCli,
 } from "../gateway/devTunnel";
+import { validateModelInfo } from "../gateway/discovery";
 import type { Gateway } from "../gateway/gateway";
+import { type DiscoverRemoteOptions, discoverRemote } from "../gateway/remote";
 import { LLM_API_KEY_SECRET_KEY } from "../utils/constant";
 import { logger } from "../utils/logger";
 
@@ -110,12 +112,106 @@ export async function hiddenSetApiKey(
   }
 }
 
+export interface DevTunnelSharingState {
+  status:
+    | "inactive"
+    | "starting"
+    | "connecting"
+    | "connected"
+    | "checkFailed"
+    | "stopFailed";
+  url?: string;
+  modelCount?: number;
+  reason?: string;
+}
+
+/** A check belongs to one owned host session, never a saved tunnel URL. */
+export class DevTunnelConnection {
+  private session = 0;
+  private current: DevTunnelSharingState = { status: "inactive" };
+
+  get state(): DevTunnelSharingState {
+    return this.current;
+  }
+
+  reset(): void {
+    this.session++;
+    this.current = { status: "inactive" };
+  }
+
+  async stop(host: Pick<DevTunnelHost, "active" | "stop">): Promise<void> {
+    const session = ++this.session;
+    const url = this.current.url;
+    try {
+      await host.stop();
+      if (session === this.session) {
+        this.reset();
+      }
+    } catch (error) {
+      if (session === this.session) {
+        this.current = host.active
+          ? { status: "stopFailed", url }
+          : { status: "inactive" };
+      }
+      throw error;
+    }
+  }
+
+  async check(
+    url: string,
+    apiKey: string | undefined,
+    options: Partial<DiscoverRemoteOptions> = {},
+  ): Promise<boolean> {
+    const session = ++this.session;
+    this.current = { status: "connecting", url };
+    const { state } = await discoverRemote(
+      { name: "shared-gateway", url },
+      {
+        apiKey,
+        attempts: 3,
+        attemptTimeoutMs: 5000,
+        retryDelayMs: 1000,
+        ...options,
+        validate: validateModelInfo,
+      },
+    );
+    if (session !== this.session) {
+      return false;
+    }
+    this.current =
+      state.status === "ready"
+        ? { status: "connected", url, modelCount: state.modelCount }
+        : { status: "checkFailed", url, reason: state.reason };
+    return true;
+  }
+}
+
+export function devTunnelSharingText(state: DevTunnelSharingState): string {
+  switch (state.status) {
+    case "inactive":
+      return "Inactive";
+    case "starting":
+      return "Starting…";
+    case "connecting":
+      return "Connecting…";
+    case "connected":
+      return `Connected (${state.modelCount} models)`;
+    case "checkFailed":
+      return "Connection check failed";
+    case "stopFailed":
+      return "Stop failed (still sharing)";
+  }
+}
+
+const connection = new DevTunnelConnection();
 let tunnelHost: DevTunnelHost | undefined;
 let startingShare: Promise<void> | undefined;
 
 function hostFor(context: vscode.ExtensionContext): DevTunnelHost {
   if (!tunnelHost) {
     tunnelHost = new DevTunnelHost(undefined, (exit) => {
+      connection.reset();
+      startingShare = undefined;
       logger.warn(
         `Background dev tunnel host stopped (kind: ${exit.kind}, code: ${exit.code ?? "none"}, signal: ${exit.signal ?? "none"}).`,
       );
@@ -128,11 +224,20 @@ function hostFor(context: vscode.ExtensionContext): DevTunnelHost {
   return tunnelHost;
 }
 
+export function devTunnelSharingState(): DevTunnelSharingState {
+  if (tunnelHost?.active) {
+    return connection.state;
+  }
+  return { status: startingShare ? "starting" : "inactive" };
+}
+
 function isSharing(): boolean {
-  return tunnelHost?.active === true;
+  return Boolean(tunnelHost?.active);
 }
 
 export async function stopDevTunnelHosting(): Promise<void> {
+  connection.reset();
+  startingShare = undefined;
   tunnelHost?.dispose();
   await tunnelHost?.stop();
 }
@@ -181,16 +286,21 @@ export async function shareViaDevTunnel(
   }
   const host = hostFor(context);
   if (!host.active) {
-    startingShare = startSharing(context, gw, host).finally(() => {
-      startingShare = undefined;
+    const starting = startSharing(context, gw, host).finally(() => {
+      if (startingShare === starting) {
+        startingShare = undefined;
+      }
     });
-    return startingShare;
+    startingShare = starting;
+    return starting;
   }
-  const url = context.globalState.get<string>(TUNNEL_URL_STATE_KEY);
+  const url = connection.state.url;
   const hasKey = Boolean(await context.secrets.get(LLM_API_KEY_SECRET_KEY));
   const picked = await vscode.window.showQuickPick(
     shareActionItems(url, hasKey),
-    { title: `Dev tunnel hosting in background${url ? `: ${url}` : ""}` },
+    {
+      title: `Dev tunnel: ${devTunnelSharingText(connection.state)}${url ? `: ${url}` : ""}`,
+    },
   );
   switch (picked?.id) {
     case "copyUrl":
@@ -202,8 +312,9 @@ export async function shareViaDevTunnel(
       );
       return;
     case "stop":
+      startingShare = undefined;
       try {
-        await host.stop();
+        await connection.stop(host);
         logger.info("Stopped sharing the gateway via dev tunnel.");
         void vscode.window.showInformationMessage(
           "Stopped sharing. The tunnel is kept and reused next time.",
@@ -325,6 +436,7 @@ async function startSharing(
     );
     await context.globalState.update(TUNNEL_ID_STATE_KEY, result.tunnelId);
     await context.globalState.update(TUNNEL_URL_STATE_KEY, result.url);
+    const apiKey = await context.secrets.get(LLM_API_KEY_SECRET_KEY);
     await host.start(cliPath, result.tunnelId);
     if (!host.active) {
       return;
@@ -332,13 +444,32 @@ async function startSharing(
     logger.info(
       `Started background dev tunnel host (${result.created ? "new" : "reused"}) for port ${port} (URL source: ${result.urlSource}).`,
     );
-    const note =
-      result.urlSource === "derived"
-        ? " This is a derived URL; the CLI did not report one."
-        : "";
+    const checked = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title:
+          "Dev tunnel: Connecting… Run Share Gateway via Dev Tunnel to stop sharing.",
+      },
+      () => connection.check(result.url, apiKey),
+    );
+    if (!checked || !host.active) {
+      return;
+    }
+    if (connection.state.status === "checkFailed") {
+      logger.warn(
+        `Dev tunnel connection check failed: ${connection.state.reason}`,
+      );
+      void vscode.window.showWarningMessage(
+        `Dev tunnel connection check failed: ${connection.state.reason} The background host is still running. Run 'Share Gateway via Dev Tunnel' to stop sharing.`,
+      );
+      return;
+    }
+    logger.info(
+      `Dev tunnel public catalog check succeeded (${connection.state.modelCount} models).`,
+    );
     void vscode.window
       .showInformationMessage(
-        `Dev tunnel hosting started in the background. Tunnel URL: ${result.url}. Connection readiness is not yet verified.${note} Run this command again to stop sharing.`,
+        `Dev tunnel: Connected (${connection.state.modelCount} models). Tunnel URL: ${result.url}. Run this command again to stop sharing.`,
         "Copy URL",
         "Copy client setup",
       )
