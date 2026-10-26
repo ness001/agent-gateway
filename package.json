@@ -2,7 +2,7 @@
   "name": "agent-gateway",
   "displayName": "Agent Gateway",
   "description": "Use your GitHub Copilot models in any agent through one local gateway, share them across machines, and enable web search, compatible with all tool calls. Works with Claude Code, Codex, Gemini CLI, Antigravity CLI, Kilo Code, Cline, DeepSeek Harness, Pi, Oh My Pi, Hermes and OpenClaw.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "ness001",
   "license": "MIT",
   "icon": "images/icon.png",

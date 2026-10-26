@@ -158,6 +158,7 @@ suite("commands/status", () => {
     assert.deepStrictEqual(
       items.filter((i) => i.action).map((i) => i.action),
       [
+        "models",
         "restart",
         "changePort",
         "fallbackModel",
@@ -167,6 +168,7 @@ suite("commands/status", () => {
         "logLevel",
         "setApiKey",
         "remotes",
+        "share",
         "webSearch",
         "clients",
       ],

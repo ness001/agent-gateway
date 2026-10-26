@@ -114,6 +114,7 @@ export function activate(context: vscode.ExtensionContext): Gateway {
         openErrorLog: () => openErrorLog(gw),
         setApiKey: () => setGatewayApiKey(context),
         remotes: () => manageRemoteUpstreams(context, gw),
+        share: () => shareViaDevTunnel(context, gw),
         webSearch: () => setWebSearchEngine(context),
         clients: () => runClientConfiguration(context, gw),
       }),
