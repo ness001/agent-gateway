@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+- Enable Codex gateway model discovery and, on macOS, its native system proxy
+  resolver so local catalog requests honor system proxy exceptions. Restore
+  previous managed feature settings when removing the gateway.
+
 ## 0.1.4
 
 - Start and manage dev tunnel sharing directly from **Status**.
