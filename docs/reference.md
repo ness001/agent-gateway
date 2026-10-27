@@ -91,6 +91,14 @@ Each changed file is backed up next to itself as
 `<file>.agent-gateway-<YYYYMMDDHHmmss>.bak`. Removing the gateway reverts only
 its own entries.
 
+Codex configuration sets `model_catalog_url` inside
+`[model_providers.agent-gateway]` to the gateway's `/v1/models` endpoint and
+enables `features.api_key_model_discovery`. On macOS only, it also enables
+`features.respect_system_proxy`, so Codex's native resolver honors the system
+proxy exception list without changing proxy environment variables. Existing
+managed feature values and the provider's catalog URL are recorded for
+restoration; unrelated features remain unchanged. Restart Codex after configuring.
+
 ### Context-window configuration
 
 Configure Coding Agents copies valid positive integer context capacities from the

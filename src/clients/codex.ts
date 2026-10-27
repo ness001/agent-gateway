@@ -1,6 +1,5 @@
 // Codex CLI / Codex desktop adapter. Edits ~/.codex/config.toml surgically:
-// only the top-level model_provider/model/context keys and the
-// [model_providers.agent-gateway] table are touched.
+// the selected model, catalog, managed features and provider table are touched.
 import * as path from "path";
 
 import { selectedContextWindow } from "./contextWindow";
@@ -17,6 +16,13 @@ const MARKER_PREFIX = "# agent-gateway previous:";
 const UNSET = "<unset>";
 const CONTEXT_KEY = "model_context_window";
 const CONTEXT_MARKER = "# agent-gateway previous context:";
+const CATALOG_KEY = "model_catalog_url";
+const PROVIDER_CATALOG_MARKER = "# agent-gateway previous provider catalog:";
+const PROVIDER_CATALOG_KEY = "provider.model_catalog_url";
+const FEATURE_MARKER = "# agent-gateway previous feature:";
+const DISCOVERY_FEATURE = "api_key_model_discovery";
+const PROXY_FEATURE = "respect_system_proxy";
+const FEATURES_HEADER_RE = /^\s*\[\s*(?:features|"features"|'features')\s*\]\s*(#.*)?$/;
 const TOP_KEYS = ["model_provider", "model"] as const;
 
 function codexConfigPath(home: string, platform: NodeJS.Platform): string {
@@ -127,6 +133,62 @@ function findTopKey(
   return undefined;
 }
 
+function findFeature(
+  p: Parsed,
+  key: string,
+): { index: number; raw: string } | undefined {
+  const dotted = findTopKey(
+    p,
+    `(?:features|"features"|'features')\\s*\\.\\s*(?:${key}|"${key}"|'${key}')`,
+  );
+  if (dotted) {
+    return dotted;
+  }
+  const headers = headerIndexes(p.lines);
+  const h = headers.findIndex((i) => FEATURES_HEADER_RE.test(p.lines[i]));
+  if (h < 0) {
+    return undefined;
+  }
+  const end = headers[h + 1] ?? p.lines.length;
+  for (let i = headers[h] + 1; i < end; i++) {
+    const match = topKeyRe(key).exec(p.lines[i]);
+    if (match) {
+      return { index: i, raw: stripComment(match[1]).trim() };
+    }
+  }
+  return undefined;
+}
+
+/** Use an existing feature table, or dotted top-level keys without adding a table. */
+function setFeature(text: string, key: string, value: string): string {
+  const p = parse(text);
+  const found = findFeature(p, key);
+  if (found?.raw === value) {
+    return text;
+  }
+  if (found) {
+    if (value === UNSET) {
+      p.lines.splice(found.index, 1);
+    } else {
+      const line = p.lines[found.index];
+      const equals = line.indexOf("=");
+      const start = equals + 1 + line.slice(equals + 1).search(/\S/);
+      p.lines[found.index] =
+        line.slice(0, start) + value + line.slice(start + found.raw.length);
+    }
+  } else if (value !== UNSET) {
+    const header = headerIndexes(p.lines).find((i) =>
+      FEATURES_HEADER_RE.test(p.lines[i]),
+    );
+    if (header !== undefined) {
+      p.lines.splice(header + 1, 0, `${key} = ${value}`);
+    } else {
+      p.lines.unshift(`features.${key} = ${value}`);
+    }
+  }
+  return join(p.lines, p.eol);
+}
+
 function stripComment(value: string): string {
   let quote: string | null = null;
   for (let i = 0; i < value.length; i++) {
@@ -168,6 +230,21 @@ function readMarker(p: Parsed): Record<string, string> | undefined {
         if (context) {
           result[CONTEXT_KEY] = context.slice(CONTEXT_MARKER.length).trim();
         }
+        for (const line of p.lines.slice(p.table.start + 1, p.table.end)) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith(PROVIDER_CATALOG_MARKER)) {
+            result[PROVIDER_CATALOG_KEY] = trimmed
+              .slice(PROVIDER_CATALOG_MARKER.length)
+              .trim();
+          } else if (trimmed.startsWith(FEATURE_MARKER)) {
+            const feature = /^(api_key_model_discovery|respect_system_proxy)=(.*)$/.exec(
+              trimmed.slice(FEATURE_MARKER.length).trim(),
+            );
+            if (feature) {
+              result[`features.${feature[1]}`] = feature[2];
+            }
+          }
+        }
         return result;
       }
     }
@@ -201,8 +278,13 @@ function buildTable(
     ...(CONTEXT_KEY in marker
       ? [`${CONTEXT_MARKER} ${marker[CONTEXT_KEY]}`]
       : []),
+    `${PROVIDER_CATALOG_MARKER} ${marker[PROVIDER_CATALOG_KEY]}`,
+    ...[DISCOVERY_FEATURE, PROXY_FEATURE]
+      .filter((key) => `features.${key}` in marker)
+      .map((key) => `${FEATURE_MARKER} ${key}=${marker[`features.${key}`]}`),
     `name = ${tomlString(GATEWAY_PROVIDER_NAME)}`,
     `base_url = ${tomlString(`${input.gatewayUrl.replace(/\/+$/, "")}/v1`)}`,
+    `${CATALOG_KEY} = ${tomlString(`${input.gatewayUrl.replace(/\/+$/, "")}/v1/models`)}`,
     `wire_api = "responses"`,
     `experimental_bearer_token = ${tomlString(key)}`,
   ];
@@ -252,6 +334,25 @@ function planCodex(
   const capacity = selectedContextWindow(input);
   if (capacity !== undefined && !(CONTEXT_KEY in marker)) {
     marker[CONTEXT_KEY] = findTopKey(p, CONTEXT_KEY)?.raw ?? UNSET;
+  }
+  if (!(PROVIDER_CATALOG_KEY in marker)) {
+    const catalogLine = p.table
+      ? p.lines.slice(p.table.start + 1, p.table.end)
+          .map((line) => topKeyRe(CATALOG_KEY).exec(line))
+          .find((match) => match !== null)
+      : undefined;
+    marker[PROVIDER_CATALOG_KEY] = catalogLine
+      ? stripComment(catalogLine[1]).trim()
+      : UNSET;
+  }
+  const features = [
+    DISCOVERY_FEATURE,
+    ...(input.platform === "darwin" ? [PROXY_FEATURE] : []),
+  ];
+  for (const key of features) {
+    if (!(`features.${key}` in marker)) {
+      marker[`features.${key}`] = findFeature(p, key)?.raw ?? UNSET;
+    }
   }
 
   // 1. Upsert the provider table.
@@ -329,7 +430,10 @@ function planCodex(
     );
   }
 
-  const after = join(lines, p.eol);
+  let after = join(lines, p.eol);
+  for (const key of features) {
+    after = setFeature(after, key, "true");
+  }
   return {
     changes: before === after ? [] : [{ path: file, before, after }],
     summary,
@@ -356,6 +460,15 @@ function unplanCodex(
   let lines = p.lines.slice();
   if (p.table) {
     lines = removeTable(lines, p.table);
+    if (marker && marker[PROVIDER_CATALOG_KEY] !== undefined && marker[PROVIDER_CATALOG_KEY] !== UNSET) {
+      lines.splice(
+        Math.min(p.table.start, lines.length),
+        0,
+        `[model_providers.${GATEWAY_PROVIDER_ID}]`,
+        `${CATALOG_KEY} = ${marker[PROVIDER_CATALOG_KEY]}`,
+        "",
+      );
+    }
     summary.push(
       `Remove [model_providers.${GATEWAY_PROVIDER_ID}] from ${file}`,
     );
@@ -415,7 +528,12 @@ function unplanCodex(
     lines.shift();
   }
 
-  const after = join(lines, p.eol);
+  let after = join(lines, p.eol);
+  for (const key of [DISCOVERY_FEATURE, PROXY_FEATURE]) {
+    if (marker && `features.${key}` in marker) {
+      after = setFeature(after, key, marker[`features.${key}`]);
+    }
+  }
   return {
     changes: before === after ? [] : [{ path: file, before, after }],
     summary: summary.length
@@ -519,7 +637,7 @@ export const codexAdapter: ClientAdapter = {
   label: "Codex CLI / Codex desktop",
   discovery: "auto",
   caveat:
-    "Codex is expected to list models from <base_url>/models (verified in the binary, not observed live for custom providers). CODEX_HOME overrides are not honoured.",
+    "Requires Codex support for api_key_model_discovery and model_catalog_url; on macOS, respect_system_proxy enables native system proxy exceptions. CODEX_HOME overrides are not honoured.",
   detectPaths: (home, platform) => [
     (platform === "win32" ? path.win32 : path.posix).join(home, ".codex"),
   ],
