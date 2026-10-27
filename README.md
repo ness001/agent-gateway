@@ -83,7 +83,7 @@ and type **Agent Gateway**.
 | Agent                    | How it is configured                                                                                                                            |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Claude Code              | Configures the gateway and automatic model discovery.                                                                                           |
-| Codex                    | Adds an `agent-gateway` provider and makes it the default.                                                                                      |
+| Codex                    | Adds an `agent-gateway` provider with automatic model discovery and makes it the default. On macOS, enables Codex's native system proxy resolver to honor proxy exceptions. |
 | Gemini CLI               | Configures the endpoint, key, model and authentication. Restart the CLI; shell or project overrides may take precedence. Not yet verified live. |
 | Antigravity CLI (`agy`)  | Configures Gemini mode and provides remaining setup steps. Requires a compatible model or mapping.                                              |
 | Oh My Pi (omp)           | Adds the gateway as a provider with automatic model discovery; pick a model with `/model`.                                                      |
