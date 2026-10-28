@@ -1117,6 +1117,35 @@ suite("protocol/openai/responses legacy tool results", () => {
       });
     }
   }
+  test("logs automation heartbeats at debug and other results at warn", () => {
+    const logs: string[] = [];
+    const logger = {
+      info: () => {},
+      warn: (m: string) => logs.push(`warn ${m}`),
+      error: () => {},
+      debug: (m: string) => logs.push(`debug ${m}`),
+    };
+    decodeResponses(
+      {
+        model: "m",
+        input: [
+          {
+            type: "function_call_output",
+            name: "automation_update",
+            namespace: "codex_app",
+            output: "<heartbeat/>",
+          },
+          { type: "function_call_output", name: "read", output: "saved" },
+        ],
+      },
+      { logger },
+    );
+    assert.deepStrictEqual(
+      logs.map((l) => l.split(" ").slice(0, 3).join(" ")),
+      ["debug openai-responses preserved", "warn openai-responses preserved"],
+    );
+    assert.ok(logs[0].includes("input[0]") && logs[1].includes("input[1]"));
+  });
   test("preserves structured image output without inventing a call", () => {
     const { core } = decodeResponses({
       model: "m",
