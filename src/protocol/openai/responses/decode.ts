@@ -434,9 +434,10 @@ function decodeInput(
       }
       case "custom_tool_call_output":
       case "function_call_output": {
-        // Resumed sessions can contain externally supplied tool results with
-        // no invocation ID. Preserve the data, but do not invent a pairing
-        // from the item ID (fco_...), tool name, or neighboring invocation.
+        // Some tool results have no invocation ID, e.g. Codex automation
+        // heartbeats (codex_app.automation_update) that no model call
+        // preceded. Preserve the data, but do not invent a pairing from the
+        // item ID (fco_...), tool name, or neighboring invocation.
         if (
           raw.call_id === undefined ||
           raw.call_id === null ||
@@ -455,9 +456,14 @@ function decodeInput(
             },
             ...toolOutput(raw.output, `${p}.output`, logger),
           ]);
-          logger?.warn(
-            `openai-responses preserved ${p} tool result without call_id as historical content`,
-          );
+          // Heartbeats are an expected shape and repeat on every turn of an
+          // automated thread, so only unknown sources warrant a warning.
+          const message = `openai-responses preserved ${p} tool result without call_id as historical content`;
+          if (name === "codex_app.automation_update") {
+            logger?.debug(message);
+          } else {
+            logger?.warn(message);
+          }
           break;
         }
         const callId = str(raw.call_id, `${p}.call_id`);
