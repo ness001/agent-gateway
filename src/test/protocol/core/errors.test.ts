@@ -210,3 +210,30 @@ suite("core/errors", () => {
     assert.strictEqual(classifyLmError(g), g);
   });
 });
+
+suite("core/errors context and quota", () => {
+  test("prompt too long maps to context_length_exceeded", () => {
+    const e = classifyLmError(
+      new Error(
+        'Request Failed: 400 {"error":{"message":"prompt is too long: 1020341 tokens > 1000000 maximum"}}',
+      ),
+    );
+    assert.strictEqual(e.kind, "upstream_rejected");
+    assert.strictEqual(e.status, 400);
+    assert.strictEqual(e.providerCode, "context_length_exceeded");
+    assert.match(e.message, /1020341 tokens > 1000000 maximum/);
+    assert.match(e.message, /compact/);
+  });
+
+  test("credit limit maps to a 429 quota error, not internal", () => {
+    const e = classifyLmError(
+      new Error(
+        "You've reached your credit limit. To continue working, please contact your organization's Copilot admin.",
+      ),
+    );
+    assert.strictEqual(e.kind, "rate_limit");
+    assert.strictEqual(e.status, 429);
+    assert.strictEqual(e.providerCode, "insufficient_quota");
+    assert.match(e.message, /^Copilot quota exhausted: /);
+  });
+});

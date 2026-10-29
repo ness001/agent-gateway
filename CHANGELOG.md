@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Report a prompt that exceeds the model's context window with the OpenAI
+  `context_length_exceeded` code and a hint to compact or shorten it.
+- Report exhausted Copilot credits as a 429 quota error instead of a 500
+  internal error.
+
 ## 0.1.6
 
 - Fix "input_schema does not support oneOf, allOf, or anyOf at the top level"

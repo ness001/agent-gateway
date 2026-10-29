@@ -167,6 +167,17 @@ export function retryAfterSeconds(text: string): number | undefined {
 
 const FAILED_RE = /Request Failed:\s*(\d{3})\s*([\s\S]*)$/i;
 
+/** Provider text for an input that exceeds the model's context window. */
+const CONTEXT_OVERFLOW_RE =
+  /prompt is too long|context[_ ]length[_ ]exceeded|maximum context length|exceeds the context window|input is too long|too many (input )?tokens/i;
+
+/** Provider text for exhausted credits or quota (not a transient rate limit). */
+const QUOTA_RE =
+  /credit limit|reached your (credit|usage|monthly|premium)|quota (exceeded|exhausted)|insufficient_quota/i;
+
+/** OpenAI-compatible code clients use to detect a full context window. */
+export const CONTEXT_LENGTH_EXCEEDED = "context_length_exceeded";
+
 /** Classify anything thrown by LanguageModelChat.sendRequest or its stream. */
 export function classifyLmError(err: unknown): GatewayError {
   if (err instanceof GatewayError) {
@@ -188,6 +199,22 @@ export function classifyLmError(err: unknown): GatewayError {
 
   if (code === "NoPermissions") {
     return new GatewayError("permission", PERMISSION_HINT, opt);
+  }
+  if (CONTEXT_OVERFLOW_RE.test(rawMsg)) {
+    const inner = clean(innerMessage(FAILED_RE.exec(rawMsg)?.[2] ?? rawMsg));
+    return new GatewayError(
+      "upstream_rejected",
+      COPILOT_REJECTED_PREFIX +
+        inner +
+        ". The conversation exceeds the model's context window; compact or shorten it and retry.",
+      { providerCode: CONTEXT_LENGTH_EXCEEDED },
+    );
+  }
+  if (QUOTA_RE.test(rawMsg)) {
+    const inner = clean(innerMessage(FAILED_RE.exec(rawMsg)?.[2] ?? rawMsg));
+    return new GatewayError("rate_limit", "Copilot quota exhausted: " + inner, {
+      providerCode: code ?? "insufficient_quota",
+    });
   }
   if (code === "Blocked") {
     return new GatewayError(
