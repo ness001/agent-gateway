@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6
+
+- Fix "input_schema does not support oneOf, allOf, or anyOf at the top level"
+  errors from newer Codex tools. The gateway merges top-level schema variants
+  into one object schema, including for requests forwarded to remote gateways
+  that run an older version.
+- Add Brave Search and Kagi as web search providers.
+- Log Codex automation heartbeats without call IDs at debug level.
+
 ## 0.1.5
 
 - Enable Codex gateway model discovery and, on macOS, its native system proxy
