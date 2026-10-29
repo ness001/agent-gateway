@@ -2,7 +2,56 @@ import * as assert from "assert";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { RemoteUnavailableError, forwardToRemote } from "../../gateway/forward";
+import {
+  RemoteUnavailableError,
+  flattenToolSchemas,
+  forwardToRemote,
+} from "../../gateway/forward";
+
+suite("flattenToolSchemas", () => {
+  const oneOf = {
+    oneOf: [
+      { type: "object", properties: { a: { type: "string" } } },
+      { type: "object", properties: { b: { type: "string" } } },
+    ],
+  };
+  const flat = {
+    type: "object",
+    properties: { a: { type: "string" }, b: { type: "string" } },
+  };
+
+  test("flattens Responses, Chat, Anthropic and namespace tools", () => {
+    const out = flattenToolSchemas({
+      tools: [
+        { type: "function", name: "r", parameters: oneOf },
+        { type: "function", function: { name: "c", parameters: oneOf } },
+        { name: "m", input_schema: oneOf },
+        {
+          type: "namespace",
+          name: "ns",
+          tools: [{ type: "function", name: "x", parameters: oneOf }],
+        },
+        { type: "custom", name: "apply_patch" },
+      ],
+    });
+    assert.deepStrictEqual(out.tools, [
+      { type: "function", name: "r", parameters: flat },
+      { type: "function", function: { name: "c", parameters: flat } },
+      { name: "m", input_schema: flat },
+      {
+        type: "namespace",
+        name: "ns",
+        tools: [{ type: "function", name: "x", parameters: flat }],
+      },
+      { type: "custom", name: "apply_patch" },
+    ]);
+  });
+
+  test("leaves bodies without tools unchanged", () => {
+    const body = { model: "m", input: "hi" };
+    assert.strictEqual(flattenToolSchemas(body), body);
+  });
+});
 
 interface Seen {
   url?: string;
