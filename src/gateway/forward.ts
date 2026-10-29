@@ -1,9 +1,54 @@
+import { flattenTopLevelComposition } from "../protocol/core/lmRequest";
 import {
   stripCallerCredentials,
   stripGeminiKeyQuery,
   stripHopByHopHeaders,
 } from "./credentials";
 import type { RemoteUpstreamConfig } from "./types";
+
+type Rec = Record<string, unknown>;
+
+const isRec = (v: unknown): v is Rec =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+function flattenSchemaFields(tool: Rec): Rec {
+  let out = tool;
+  for (const key of ["parameters", "input_schema"] as const) {
+    if (isRec(out[key])) {
+      out = { ...out, [key]: flattenTopLevelComposition(out[key]) };
+    }
+  }
+  if (isRec(out.function) && isRec(out.function.parameters)) {
+    out = {
+      ...out,
+      function: {
+        ...out.function,
+        parameters: flattenTopLevelComposition(out.function.parameters),
+      },
+    };
+  }
+  if (Array.isArray(out.tools)) {
+    out = {
+      ...out,
+      tools: out.tools.map((t) => (isRec(t) ? flattenSchemaFields(t) : t)),
+    };
+  }
+  return out;
+}
+
+/**
+ * A remote gateway may run an older build that sends tool schemas with
+ * top-level oneOf/allOf/anyOf, which Copilot rejects. Flatten them here too.
+ */
+export function flattenToolSchemas(body: Rec): Rec {
+  if (!Array.isArray(body.tools)) {
+    return body;
+  }
+  return {
+    ...body,
+    tools: body.tools.map((t) => (isRec(t) ? flattenSchemaFields(t) : t)),
+  };
+}
 
 export type RemoteFailureCategory =
   | "connection refused"
@@ -141,7 +186,10 @@ export async function forwardToRemote(
     body =
       args.body === undefined
         ? undefined
-        : JSON.stringify({ ...args.body, model: args.upstreamModelId });
+        : JSON.stringify({
+            ...flattenToolSchemas(args.body),
+            model: args.upstreamModelId,
+          });
   }
   if (body !== undefined) {
     headers.set("content-type", "application/json");
