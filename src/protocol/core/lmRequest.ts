@@ -171,8 +171,84 @@ export function toLmTool(t: ToolDef): LmToolLike {
   return {
     name: t.name,
     description: t.description ?? "",
-    inputSchema: t.inputSchema,
+    inputSchema: flattenTopLevelComposition(t.inputSchema),
   };
+}
+
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(v: unknown): v is JsonObject {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Copilot rejects `oneOf`, `allOf` and `anyOf` at the top level of a tool
+ * input schema. Merge the object variants into one object schema: `allOf`
+ * keeps every variant's `required`; `oneOf`/`anyOf` keep only the names all
+ * variants require. Nested compositions are left as they are.
+ */
+export function flattenTopLevelComposition(schema: object): object;
+export function flattenTopLevelComposition(
+  schema: object | undefined,
+): object | undefined;
+export function flattenTopLevelComposition(
+  schema: object | undefined,
+): object | undefined {
+  if (!isJsonObject(schema)) {
+    return schema;
+  }
+  const keys = ["allOf", "anyOf", "oneOf"] as const;
+  if (!keys.some((k) => Array.isArray(schema[k]))) {
+    return schema;
+  }
+  const rest: JsonObject = { ...schema };
+  const properties: JsonObject = isJsonObject(schema.properties)
+    ? { ...schema.properties }
+    : {};
+  const required = new Set<string>(
+    Array.isArray(schema.required)
+      ? schema.required.filter((r): r is string => typeof r === "string")
+      : [],
+  );
+  for (const key of keys) {
+    const variants = schema[key];
+    delete rest[key];
+    if (!Array.isArray(variants)) {
+      continue;
+    }
+    const objects = variants.map((v) =>
+      isJsonObject(v) ? flattenTopLevelComposition(v) : {},
+    ) as JsonObject[];
+    const requiredSets: string[][] = [];
+    for (const v of objects) {
+      if (isJsonObject(v.properties)) {
+        for (const [name, prop] of Object.entries(v.properties)) {
+          if (!(name in properties)) {
+            properties[name] = prop;
+          }
+        }
+      }
+      requiredSets.push(
+        Array.isArray(v.required)
+          ? v.required.filter((r): r is string => typeof r === "string")
+          : [],
+      );
+    }
+    if (key === "allOf") {
+      requiredSets.flat().forEach((r) => required.add(r));
+    } else if (requiredSets.length > 0) {
+      requiredSets[0]
+        .filter((r) => requiredSets.every((s) => s.includes(r)))
+        .forEach((r) => required.add(r));
+    }
+  }
+  const out: JsonObject = { ...rest, type: "object", properties };
+  if (required.size > 0) {
+    out.required = [...required];
+  } else {
+    delete out.required;
+  }
+  return out;
 }
 
 /**

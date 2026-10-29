@@ -7,6 +7,7 @@ import {
   MAX_TOKENS_OPTION_KEY,
   REASONING_EFFORT_OPTION_KEY,
   buildLmRequest,
+  flattenTopLevelComposition,
 } from "../../../protocol/core/lmRequest";
 import type { CoreRequest } from "../../../protocol/core/types";
 
@@ -299,5 +300,59 @@ suite("protocol/core/lmRequest", () => {
   test("output limit forwarded unchanged", () => {
     const o = buildLmRequest(fake, req({ maxOutputTokens: 64000 })).options;
     assert.strictEqual(o.modelOptions[MAX_TOKENS_OPTION_KEY], 64000);
+  });
+});
+
+suite("protocol/core/lmRequest flattenTopLevelComposition", () => {
+  test("merges top-level oneOf into one object schema", () => {
+    const out = flattenTopLevelComposition({
+      oneOf: [
+        {
+          type: "object",
+          properties: { id: { type: "string" }, url: { type: "string" } },
+          required: ["id", "url"],
+        },
+        {
+          type: "object",
+          properties: { id: { type: "string" }, path: { type: "string" } },
+          required: ["id"],
+        },
+      ],
+    });
+    assert.deepStrictEqual(out, {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        url: { type: "string" },
+        path: { type: "string" },
+      },
+      required: ["id"],
+    });
+  });
+
+  test("allOf keeps every required name and base properties", () => {
+    const out = flattenTopLevelComposition({
+      type: "object",
+      description: "d",
+      properties: { a: { type: "number" } },
+      allOf: [
+        { properties: { b: { type: "string" } }, required: ["b"] },
+        { anyOf: [{ properties: { c: {} }, required: ["c"] }] },
+      ],
+    });
+    assert.deepStrictEqual(out, {
+      type: "object",
+      description: "d",
+      properties: { a: { type: "number" }, b: { type: "string" }, c: {} },
+      required: ["b", "c"],
+    });
+  });
+
+  test("leaves schemas without top-level composition unchanged", () => {
+    const schema = {
+      type: "object",
+      properties: { x: { anyOf: [{ type: "string" }, { type: "null" }] } },
+    };
+    assert.strictEqual(flattenTopLevelComposition(schema), schema);
   });
 });
