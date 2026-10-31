@@ -13,9 +13,8 @@ import {
   devTunnelSharingText,
 } from "./share";
 
-export const RECENT_ERRORS_SHOWN = 5;
-
 export type StatusAction =
+  | "apiUrls"
   | "restart"
   | "changePort"
   | "fallbackModel"
@@ -39,7 +38,8 @@ export interface StatusItem {
   url?: string;
 }
 
-function apiUrlItems(h: HealthSnapshot): StatusItem[] {
+/** Items of the API URLs sub-picker; empty when the listener is inactive. */
+export function apiUrlItems(h: HealthSnapshot): StatusItem[] {
   if (!h.listener.active || !h.listener.address) {
     return [];
   }
@@ -47,7 +47,6 @@ function apiUrlItems(h: HealthSnapshot): StatusItem[] {
   const geminiDetail =
     "Select to copy. Replace {model} with a model ID from GET /v1/models.";
   return [
-    { label: "API URLs — select to copy", separator: true },
     ...[
       ["Gateway base URL", "", "Base URL for Anthropic and Gemini clients."],
       [
@@ -111,13 +110,12 @@ const ACTIONS: [StatusAction, string, string?][] = [
   ["clients", "$(gear) Configure coding agents"],
 ];
 
-/** Items of the Status picker: state, recent errors, API URLs, then actions. */
+/** Items of the Status picker: state, then actions (API URLs in a sub-picker). */
 export function statusItems(
   h: HealthSnapshot,
   logLevel: GatewayLogLevel = "info",
   sharing: DevTunnelSharingState = devTunnelSharingState(),
 ): StatusItem[] {
-  const recent = h.errors.recent.slice(0, RECENT_ERRORS_SHOWN);
   return [
     { label: `Status: ${h.status}` },
     { label: `Listener: ${h.listener.address ?? "inactive"}` },
@@ -152,20 +150,16 @@ export function statusItems(
     ...(h.lastStartupError
       ? [{ label: `Last startup error: ${h.lastStartupError}` }]
       : []),
-    ...(recent.length > 0
+    { label: "Actions", separator: true },
+    ...(apiUrlItems(h).length > 0
       ? [
-          { label: "Recent errors", separator: true },
-          ...recent.map((e) => ({
-            label: `${e.status} ${e.kind ?? ""} ${e.model ?? ""}`
-              .replace(/\s+/g, " ")
-              .trim(),
-            description: `request ${e.requestId}`,
-            detail: `${e.time} ${e.protocol} ${e.method} ${e.path}${e.remote ? ` via ${e.remote}` : ""} ${e.elapsedMs}ms`,
-          })),
+          {
+            label: "$(link) API URLs",
+            detail: "Gateway endpoints for clients; select to copy a URL.",
+            action: "apiUrls" as const,
+          },
         ]
       : []),
-    ...apiUrlItems(h),
-    { label: "Actions", separator: true },
     ...ACTIONS.map(([action, label, description]) => ({
       label:
         action === "share" && sharing.status !== "inactive"
@@ -238,10 +232,21 @@ async function showModels(gw: Gateway): Promise<void> {
   }
 }
 
+async function showApiUrls(gw: Gateway): Promise<void> {
+  const picked = await vscode.window.showQuickPick(apiUrlItems(gw.health()), {
+    title: "Gateway API URLs — select to copy",
+    matchOnDescription: true,
+  });
+  if (picked?.url) {
+    await vscode.env.clipboard.writeText(picked.url);
+    void vscode.window.showInformationMessage("Gateway API URL copied.");
+  }
+}
+
 export async function showStatus(
   gw: Gateway,
   run: Record<
-    Exclude<StatusAction, "showLog" | "logLevel" | "models">,
+    Exclude<StatusAction, "showLog" | "logLevel" | "models" | "apiUrls">,
     () => Thenable<unknown>
   >,
 ): Promise<void> {
@@ -258,12 +263,11 @@ export async function showStatus(
   const picked = await vscode.window.showQuickPick(items, {
     title: "Agent Gateway",
   });
-  if (picked?.url) {
-    await vscode.env.clipboard.writeText(picked.url);
-    void vscode.window.showInformationMessage("Gateway API URL copied.");
+  if (!picked?.action) {
     return;
   }
-  if (!picked?.action) {
+  if (picked.action === "apiUrls") {
+    await showApiUrls(gw);
     return;
   }
   if (picked.action === "models") {
