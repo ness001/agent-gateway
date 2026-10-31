@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.7
 
+- Simplify the Status panel: hide recent errors (use Open error log) and
+  move the API URLs into a separate API URLs picker.
 - Report a prompt that exceeds the model's context window with the OpenAI
   `context_length_exceeded` code and a hint to compact or shorten it.
 - Report exhausted Copilot credits as a 429 quota error instead of a 500
