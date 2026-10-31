@@ -14,7 +14,7 @@ import { fallbackModelItems } from "../../commands/fallback";
 import { listeningOn, validatePort } from "../../commands/port";
 import { remoteListItems, remoteStateText } from "../../commands/remotes";
 import { shareActionItems } from "../../commands/share";
-import { RECENT_ERRORS_SHOWN, statusItems } from "../../commands/status";
+import { statusItems } from "../../commands/status";
 import { webSearchEngineItems } from "../../commands/webSearch";
 import type { HealthSnapshot } from "../../gateway/health";
 import { WEB_SEARCH_ENGINES } from "../../protocol/hosted/catalog";
@@ -150,15 +150,14 @@ suite("commands/status", () => {
     assert.ok(labels.includes("Remote a: ready, 2 models"));
     assert.ok(labels.includes("Remote b: skipped: 401"));
     assert.ok(labels.includes("Last startup error: boom"));
-    assert.ok(labels.includes("502 upstream m"));
-    assert.strictEqual(
-      items.filter((i) => i.description?.startsWith("request ")).length,
-      RECENT_ERRORS_SHOWN,
-    );
+    assert.ok(!labels.includes("502 upstream m"));
+    assert.ok(!items.some((i) => i.description?.startsWith("request ")));
+    assert.ok(!items.some((i) => i.url));
     assert.deepStrictEqual(
       items.filter((i) => i.action).map((i) => i.action),
       [
         "models",
+        "apiUrls",
         "restart",
         "changePort",
         "fallbackModel",
@@ -241,7 +240,7 @@ suite("commands/status", () => {
     assert.strictEqual(def[0].label, "No fallback");
   });
 
-  test("no error section without errors", () => {
+  test("no error section in the status panel", () => {
     assert.ok(!statusItems(health()).some((i) => i.label === "Recent errors"));
   });
 });
