@@ -8,7 +8,7 @@ import {
   shareActionItems,
   shareViaDevTunnel,
 } from "../../commands/share";
-import { showStatus, statusItems } from "../../commands/status";
+import { apiUrlItems, showStatus, statusItems } from "../../commands/status";
 import type { Gateway } from "../../gateway/gateway";
 import type { HealthSnapshot } from "../../gateway/health";
 
@@ -401,7 +401,7 @@ suite("commands/status models", () => {
 
 suite("commands/status API URLs", () => {
   test("lists only supported routes using the actual listener address", () => {
-    const items = statusItems(health()).filter((i) => i.url);
+    const items = apiUrlItems(health());
     assert.deepStrictEqual(
       items.map((i) => i.url),
       [
@@ -425,18 +425,29 @@ suite("commands/status API URLs", () => {
     );
   });
 
+  test("status panel links to API URLs instead of listing them", () => {
+    const items = statusItems(health());
+    assert.ok(!items.some((i) => i.url));
+    assert.ok(items.some((i) => i.action === "apiUrls"));
+    assert.ok(
+      !statusItems(health({ active: false, address: null })).some(
+        (i) => i.action === "apiUrls",
+      ),
+    );
+  });
+
   test("does not invent URLs when the listener is inactive or missing", () => {
     for (const listener of [
       { active: false, address: null },
       { active: false, address: "http://127.0.0.1:4141" },
       { active: true, address: null },
     ]) {
-      assert.ok(!statusItems(health(listener)).some((i) => i.url));
+      assert.ok(!apiUrlItems(health(listener)).some((i) => i.url));
     }
   });
 
   test("normalizes a trailing slash without changing the listener host", () => {
-    const items = statusItems(
+    const items = apiUrlItems(
       health({ active: true, address: "http://[::1]:5151/" }),
     );
     assert.strictEqual(
@@ -449,11 +460,14 @@ suite("commands/status API URLs", () => {
     const showQuickPick = vscode.window.showQuickPick;
     const showInformationMessage = vscode.window.showInformationMessage;
     const clipboard = await vscode.env.clipboard.readText();
-    const selected = statusItems(health()).find((i) =>
-      i.url?.endsWith("/v1/messages/count_tokens"),
-    );
+    const picks = [
+      statusItems(health()).find((i) => i.action === "apiUrls"),
+      apiUrlItems(health()).find((i) =>
+        i.url?.endsWith("/v1/messages/count_tokens"),
+      ),
+    ];
     Object.assign(vscode.window, {
-      showQuickPick: async () => selected,
+      showQuickPick: async () => picks.shift(),
       showInformationMessage: async () => undefined,
     });
     try {
