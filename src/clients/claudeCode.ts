@@ -130,10 +130,10 @@ function configureContext(
 
 export const claudeCodeAdapter: ClientAdapter = {
   id: "claude-code",
-  label: "Claude Code CLI / Claude desktop Code tab",
+  label: "Claude Code CLI",
   discovery: "auto",
   caveat:
-    "Claude desktop chat is not configurable; the desktop Code tab is assumed to read the same ~/.claude/settings.json.",
+    "Configures the CLI only. Claude Desktop requires separate third-party inference configuration; these settings do not enable its Code tab or change subscription access.",
   detectPaths(home, platform) {
     return [pathApi(platform).join(home, ".claude")];
   },
@@ -149,6 +149,7 @@ export const claudeCodeAdapter: ClientAdapter = {
     let text = before && before.trim() ? before : "{}\n";
     const summary = [
       `Set env ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_MODEL=${desired.ANTHROPIC_MODEL}, gateway model discovery and CLAUDE_CODE_AUTO_MODE_SERVER=0 in ${file}.`,
+      "This configures Claude Code CLI only; Claude Desktop needs separate third-party inference configuration and its account access is unchanged.",
     ];
     if (!(PREVIOUS_KEY in env)) {
       const previous: Record<string, unknown> = {};
