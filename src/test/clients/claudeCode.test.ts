@@ -41,6 +41,22 @@ function after(p: ClientPlan): string {
 }
 
 suite("claudeCodeAdapter", () => {
+  test("configuration scope excludes Desktop account and provider setup", () => {
+    assert.strictEqual(claudeCodeAdapter.label, "Claude Code CLI");
+    assert.ok(
+      claudeCodeAdapter.caveat?.includes("separate third-party inference"),
+    );
+    const plan = claudeCodeAdapter.plan(input, {});
+    assert.deepStrictEqual(
+      plan.changes.map((change) => change.path),
+      [FILE],
+    );
+    assert.ok(plan.summary.some((line) => line.includes("CLI only")));
+    assert.ok(
+      plan.summary.some((line) => line.includes("account access is unchanged")),
+    );
+  });
+
   test("paths use platform home", () => {
     assert.deepStrictEqual(claudeCodeAdapter.configPaths(HOME, "win32"), [
       FILE,
