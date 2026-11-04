@@ -62,12 +62,10 @@ suite("devTunnel", () => {
   });
 
   test("CLI falls back to WinGet links on Windows", async () => {
-    const exec = fakeExec(() => ({
-      code: -1,
-      stdout: "",
-      stderr: "",
-      spawnError: "ENOENT",
-    }));
+    const exec: ExecFn = async (file) =>
+      file === "devtunnel"
+        ? { code: -1, stdout: "", stderr: "", spawnError: "ENOENT" }
+        : ok("1.0");
     const found = await findDevTunnelCli({
       exec,
       platform: "win32",
@@ -82,6 +80,92 @@ suite("devTunnel", () => {
       await findDevTunnelCli({ exec: fakeExec(() => ok("1.0")) }),
       "devtunnel",
     );
+  });
+
+  test("version check timeout is reported rather than classified as missing", async () => {
+    await assert.rejects(
+      findDevTunnelCli({
+        exec: fakeExec(() => ({
+          code: -1,
+          stdout: "",
+          stderr: "",
+          timedOut: true,
+        })),
+        platform: "win32",
+        localAppData: "C:\\x",
+        exists: () => false,
+      }),
+      /devtunnel --version timed out after 10s/,
+    );
+  });
+
+  test("version check failure reports exit code and redacted CLI output", async () => {
+    await assert.rejects(
+      findDevTunnelCli({
+        exec: fakeExec(() => ({
+          code: 7,
+          stdout: "",
+          stderr:
+            "Failed to load configuration. token=eyJhbGciOi.eyJzdWIiOiIx.abc",
+        })),
+        platform: "win32",
+        localAppData: "C:\\x",
+        exists: () => false,
+      }),
+      (error: Error) => {
+        assert.match(
+          error.message,
+          /devtunnel --version failed \(exit code 7\)/,
+        );
+        assert.match(error.message, /Failed to load configuration/);
+        assert.ok(!error.message.includes("eyJhbGciOi"));
+        return true;
+      },
+    );
+  });
+
+  test("an invalid configured path reports a start error without falling back", async () => {
+    const files: string[] = [];
+    await assert.rejects(
+      findDevTunnelCli({
+        cliPath: "C:\\missing\\devtunnel.exe",
+        exec: async (file) => {
+          files.push(file);
+          return { code: -1, stdout: "", stderr: "", spawnError: "ENOENT" };
+        },
+      }),
+      /Could not start devtunnel --version \(ENOENT\)/,
+    );
+    assert.deepStrictEqual(files, ["C:\\missing\\devtunnel.exe"]);
+  });
+
+  test("a permission error reports a start error instead of missing", async () => {
+    await assert.rejects(
+      findDevTunnelCli({
+        exec: fakeExec(() => ({
+          code: -1,
+          stdout: "",
+          stderr: "",
+          spawnError: "EACCES",
+        })),
+      }),
+      /Could not start devtunnel --version \(EACCES\)/,
+    );
+  });
+
+  test("explicit executable path is checked before PATH", async () => {
+    const files: string[] = [];
+    assert.strictEqual(
+      await findDevTunnelCli({
+        cliPath: "C:\\tools\\devtunnel.exe",
+        exec: async (file) => {
+          files.push(file);
+          return ok("1.0");
+        },
+      }),
+      "C:\\tools\\devtunnel.exe",
+    );
+    assert.deepStrictEqual(files, ["C:\\tools\\devtunnel.exe"]);
   });
 
   test("not logged in", async () => {
