@@ -57,7 +57,10 @@ configuration, manual steps and live-testing limitations.
 4. Run **Agent Gateway: Configure Coding Agents**, pick your agents and a
    default model, review the changes and confirm.
 
-Follow any remaining setup or restart instructions shown for your agents.
+The selected model becomes the startup default where an agent supports it.
+Antigravity and Cursor still need manual model selection. Project, session, or
+command-line settings can override a global default. Follow any remaining setup
+or restart instructions shown for your agents.
 The default local endpoint is `http://127.0.0.1:24444`. Open **Status** >
 **API URLs** to copy endpoints using your configured port, including token-count URLs.
 
@@ -80,21 +83,21 @@ and type **Agent Gateway**.
 
 ## Supported agents
 
-| Agent                    | How it is configured                                                                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code              | Configures the gateway and automatic model discovery.                                                                                           |
+| Agent                    | How it is configured                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code              | Configures the gateway and automatic model discovery.                                                                                                                       |
 | Codex                    | Adds an `agent-gateway` provider with automatic model discovery and makes it the default. On macOS, enables Codex's native system proxy resolver to honor proxy exceptions. |
-| Gemini CLI               | Configures the endpoint, key, model and authentication. Restart the CLI; shell or project overrides may take precedence. Not yet verified live. |
-| Antigravity CLI (`agy`)  | Configures Gemini mode and provides remaining setup steps. Requires a compatible model or mapping.                                              |
-| Oh My Pi (omp)           | Adds the gateway as a provider with automatic model discovery; pick a model with `/model`.                                                      |
-| Pi                       | Adds the gateway with its model list; run **Configure Coding Agents** again after models change.                                                |
-| Hermes Agent             | Adds an `agent-gateway` provider; run `hermes --provider agent-gateway` or pick it in `hermes model`.                                           |
-| OpenClaw                 | Adds the gateway with its model list. Checked against OpenClaw's documentation, not yet tested with a live install.                             |
-| Kilo Code                | Adds the gateway with its model list; pick `agent-gateway/<model>` with `/models`.                                                              |
-| Cline (CLI)              | Adds an OpenAI Compatible provider and makes it active; switch models with `cline -m <model>`. The Cline VS Code extension is set up by hand.   |
-| DeepSeek Harness (`dsh`) | Adds the gateway with its model list and makes your chosen model the default; removing it restores the previous default.                        |
-| Cursor                   | Shows manual steps. Cursor calls models from its own servers, so it needs a shared (dev tunnel) URL.                                            |
-| Any other agent          | Use the OpenAI, Anthropic or Gemini base URL; see [manual setup](docs/reference.md#manual-client-setup).                                        |
+| Gemini CLI               | Configures the endpoint, key, model and authentication. Restart the CLI; shell or project overrides may take precedence. Not yet verified live.                             |
+| Antigravity CLI (`agy`)  | Configures Gemini mode and provides remaining setup steps. Requires a compatible model or mapping.                                                                          |
+| Oh My Pi (omp)           | Adds the gateway with automatic model discovery and sets the global `modelRoles.default`; project and session roles may override it.                                        |
+| Pi                       | Adds the gateway with its model list and sets global `defaultProvider` and `defaultModel`; reconfigure after models change.                                                 |
+| Hermes Agent             | Adds an `agent-gateway` provider and selects it and the chosen model as global defaults.                                                                                    |
+| OpenClaw                 | Adds the gateway with its model list. Checked against OpenClaw's documentation, not yet tested with a live install.                                                         |
+| Kilo Code                | Adds the gateway with its model list and sets `model` to `agent-gateway/<model>` for new sessions.                                                                          |
+| Cline (CLI)              | Adds an OpenAI Compatible provider and makes it active; switch models with `cline -m <model>`. The Cline VS Code extension is set up by hand.                               |
+| DeepSeek Harness (`dsh`) | Adds the gateway with its model list and makes your chosen model the default; removing it restores the previous default.                                                    |
+| Cursor                   | Shows manual steps. Cursor calls models from its own servers, so it needs a shared (dev tunnel) URL.                                                                        |
+| Any other agent          | Use the OpenAI, Anthropic or Gemini base URL; see [manual setup](docs/reference.md#manual-client-setup).                                                                    |
 
 Each changed file is backed up next to itself as
 `<file>.agent-gateway-<timestamp>.bak`. **Configure Coding Agents** >

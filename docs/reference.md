@@ -75,8 +75,8 @@ This adapter has focused configuration tests but is not yet verified live.
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | Codex            | `~/.codex/config.toml`                                                                                                          | discovered         |
 | Claude Code      | `~/.claude/settings.json`                                                                                                       | discovered         |
-| Oh My Pi (omp)   | `~/.omp/agent/models.yml`                                                                                                       | discovered         |
-| Pi               | `~/.pi/agent/models.json`                                                                                                       | written list       |
+| Oh My Pi (omp)   | `~/.omp/agent/models.yml`, `config.yml` (`.yaml` when that is the only file)                                                    | discovered         |
+| Pi               | `~/.pi/agent/models.json`, `settings.json`                                                                                      | written list       |
 | Hermes Agent     | `%LOCALAPPDATA%\hermes\config.yaml` on Windows, else `~/.hermes/config.yaml` (`HERMES_HOME` wins)                               | discovered         |
 | OpenClaw         | `~/.openclaw/openclaw.json`                                                                                                     | written list       |
 | Kilo Code        | `~/.config/kilo/kilo.jsonc` (or `kilo.json` when that is the only file)                                                         | written list       |
@@ -89,7 +89,12 @@ source, not a live install.
 
 Each changed file is backed up next to itself as
 `<file>.agent-gateway-<YYYYMMDDHHmmss>.bak`. Removing the gateway reverts only
-its own entries.
+its own entries. Oh My Pi sets global `modelRoles.default`, Pi sets global
+`defaultProvider` and `defaultModel`, Kilo sets top-level `model`, and Hermes
+sets `model.provider` and `model.default`. Each writes an
+`agent-gateway-default.json` file beside its config to record the prior default
+for removal. Project, session, and command-line selections can override global
+values. Antigravity and Cursor still need manual model selection.
 
 Codex configuration sets `model_catalog_url` inside
 `[model_providers.agent-gateway]` to the gateway's `/v1/models` endpoint and
@@ -104,15 +109,15 @@ restoration; unrelated features remain unchanged. Restart Codex after configurin
 Configure Coding Agents copies valid positive integer context capacities from the
 gateway model metadata, not from model names or output-token limits.
 
-| Agent | Context configuration |
-| --- | --- |
-| Claude Code | Selected model: `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` |
-| Codex | Selected model: `model_context_window` |
-| Pi, OpenClaw, DeepSeek Harness | Per-model `contextWindow` in their existing model lists |
-| Kilo | Per-model `limit.context`, even when output metadata is unavailable |
-| Hermes | Per-model `providers.agent-gateway.models.<id>.context_length`; a user-pinned global context setting may take precedence |
-| Oh My Pi | Existing model discovery reads gateway metadata; no static override is written |
-| Cline CLI, Cursor, Antigravity | No verified context-setting support in these adapters; no override is written |
+| Agent                          | Context configuration                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Claude Code                    | Selected model: `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS`                                                                     |
+| Codex                          | Selected model: `model_context_window`                                                                                   |
+| Pi, OpenClaw, DeepSeek Harness | Per-model `contextWindow` in their existing model lists                                                                  |
+| Kilo                           | Per-model `limit.context`, even when output metadata is unavailable                                                      |
+| Hermes                         | Per-model `providers.agent-gateway.models.<id>.context_length`; a user-pinned global context setting may take precedence |
+| Oh My Pi                       | Existing model discovery reads gateway metadata; no static override is written                                           |
+| Cline CLI, Cursor, Antigravity | No verified context-setting support in these adapters; no override is written                                            |
 
 Claude Code and Codex replace the existing context override and record it for
 restoration on unconfigure, including upgrades of older gateway configurations.
