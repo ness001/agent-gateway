@@ -30,8 +30,12 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           tag="v$version"
 
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "$tag already exists; nothing to do."
+          tag_sha="$(git ls-remote --tags origin "refs/tags/$tag^{}" | cut -f1)"
+          if [ -z "$tag_sha" ]; then
+            tag_sha="$(git ls-remote --tags origin "refs/tags/$tag" | cut -f1)"
+          fi
+          if [ -n "$tag_sha" ] && [ "$tag_sha" != "$sha" ]; then
+            echo "$tag already exists at $tag_sha; nothing to do."
             exit 0
           fi
 
@@ -43,6 +47,17 @@ jobs:
             exit 1
           fi
 
-          git tag "$tag" "$sha"
-          git push origin "refs/tags/$tag"
+          if [ -z "$tag_sha" ]; then
+            git tag "$tag" "$sha"
+            git push origin "refs/tags/$tag"
+          fi
+
+          release_run="$(gh run list --workflow release.yml --commit "$sha" \
+            --json databaseId \
+            -q '.[0].databaseId')"
+          if [ -n "$release_run" ]; then
+            echo "$tag already has release workflow run $release_run; nothing to do."
+            exit 0
+          fi
+
           gh workflow run release.yml --ref "$tag"
