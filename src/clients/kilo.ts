@@ -23,6 +23,37 @@ import {
 // options.baseURL, and a static models map (no discovery for custom providers).
 
 const FORMAT: FormattingOptions = { insertSpaces: true, tabSize: 2, eol: "\n" };
+function backupPath(home: string, platform: NodeJS.Platform): string {
+  return pathApi(platform).join(
+    home,
+    ".config",
+    "kilo",
+    "agent-gateway-default.json",
+  );
+}
+
+interface PreviousModel {
+  model: string | null;
+  configExisted: boolean;
+}
+
+function previousModel(text: string | undefined): PreviousModel | undefined {
+  if (text === undefined) {
+    return undefined;
+  }
+  const value: unknown = JSON.parse(text);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Kilo gateway model backup is invalid.");
+  }
+  const { model, configExisted } = value as Record<string, unknown>;
+  if (
+    (model !== null && typeof model !== "string") ||
+    typeof configExisted !== "boolean"
+  ) {
+    throw new Error("Kilo gateway model backup is invalid.");
+  }
+  return { model, configExisted };
+}
 
 function pathApi(platform: NodeJS.Platform): path.PlatformPath {
   return platform === "win32" ? path.win32 : path.posix;
@@ -119,7 +150,7 @@ export const kiloAdapter: ClientAdapter = {
   },
   configPaths(home, platform) {
     const { jsonc, json } = kiloPaths(home, platform);
-    return [jsonc, json];
+    return [jsonc, json, backupPath(home, platform)];
   },
   plan(input, files) {
     const target = kiloTarget(input, files);
@@ -127,9 +158,44 @@ export const kiloAdapter: ClientAdapter = {
     let text = before === undefined || before.trim() === "" ? "{}\n" : before;
     const root = parseJsonc(text, target);
     if (root === null || typeof root !== "object" || Array.isArray(root)) {
-      text = "{}\n";
+      throw new Error(
+        `Cannot safely edit ${target}: config must be an object.`,
+      );
     }
     const models = kiloModels(input.models);
+    if (!Object.hasOwn(models, input.defaultModel)) {
+      throw new Error(
+        `Selected model ${input.defaultModel} is not available in Kilo's model list.`,
+      );
+    }
+    const backup = backupPath(input.home, input.platform);
+    const backupBefore = files[backup];
+    const previous = previousModel(backupBefore);
+    const originalModel = (root as Record<string, unknown>).model;
+    const gatewayModel =
+      typeof originalModel === "string" &&
+      originalModel.startsWith(`${GATEWAY_PROVIDER_ID}/`);
+    if (originalModel !== undefined && typeof originalModel !== "string") {
+      throw new Error(
+        `Cannot safely save Kilo's previous default in ${target}.`,
+      );
+    }
+    const refresh = previous !== undefined && !gatewayModel;
+    const backupAfter =
+      gatewayModel && previous === undefined
+        ? undefined // Legacy gateway selection: the earlier default is unknown.
+        : backupBefore === undefined || refresh
+          ? JSON.stringify(
+              {
+                model: originalModel ?? null,
+                configExisted: refresh
+                  ? previous!.configExisted
+                  : before !== undefined,
+              },
+              null,
+              2,
+            ) + "\n"
+          : backupBefore;
     const key = ["provider", GATEWAY_PROVIDER_ID];
     text = edit(text, [...key, "npm"], "@ai-sdk/openai-compatible");
     text = edit(text, [...key, "name"], GATEWAY_PROVIDER_NAME);
@@ -144,48 +210,123 @@ export const kiloAdapter: ClientAdapter = {
       input.apiKey || PLACEHOLDER_API_KEY,
     );
     text = edit(text, [...key, "models"], models);
+    text = edit(
+      text,
+      ["model"],
+      `${GATEWAY_PROVIDER_ID}/${input.defaultModel}`,
+    );
     return {
-      changes: change(target, before, text),
+      changes: [
+        ...change(backup, backupBefore, backupAfter),
+        ...change(target, before, text),
+      ],
       summary: [
         `Write provider "${GATEWAY_PROVIDER_ID}" with ${Object.keys(models).length} model(s) to ${target}.`,
-        `Kilo's default model is not changed; pick "${GATEWAY_PROVIDER_ID}/${input.defaultModel}" with /models in Kilo.`,
+        `Set Kilo's default model to ${GATEWAY_PROVIDER_ID}/${input.defaultModel} in ${target}.`,
       ],
-      afterApply: `Restart Kilo, then run /models and choose ${GATEWAY_PROVIDER_ID}/${input.defaultModel}.`,
+      afterApply:
+        "Restart Kilo to use the selected default model in new sessions.",
     };
   },
   unplan(input, files) {
     const target = kiloTarget(input, files);
     const before = files[target];
+    const root = before === undefined ? null : parseJsonc(before, target);
+    if (
+      before !== undefined &&
+      (root === null || typeof root !== "object" || Array.isArray(root))
+    ) {
+      throw new Error(
+        `Cannot safely remove Kilo's provider: ${target} must be an object.`,
+      );
+    }
+    const config = root as {
+      provider?: Record<string, unknown>;
+      model?: unknown;
+    } | null;
+    if (
+      config?.provider !== undefined &&
+      (config.provider === null ||
+        typeof config.provider !== "object" ||
+        Array.isArray(config.provider))
+    ) {
+      throw new Error(
+        `Cannot safely remove Kilo's provider: provider must be an object.`,
+      );
+    }
+    const backup = backupPath(input.home, input.platform);
+    const backupBefore = files[backup];
+    const previous = previousModel(backupBefore);
     if (before === undefined) {
+      if (previous?.configExisted) {
+        throw new Error(
+          `Cannot safely restore Kilo's previous default in ${target}: the config file is missing.`,
+        );
+      }
       return {
-        changes: [],
-        summary: [`${target} does not exist; nothing to remove.`],
+        changes: change(backup, backupBefore, undefined),
+        summary: [
+          `${target} does not exist; removed the saved gateway default.`,
+        ],
       };
     }
-    const root = parseJsonc(before, target) as {
-      provider?: Record<string, unknown>;
-    } | null;
-    if (!root?.provider || !(GATEWAY_PROVIDER_ID in root.provider)) {
+    if (!config?.provider || !(GATEWAY_PROVIDER_ID in config.provider)) {
+      let text = before;
+      if (
+        previous !== undefined &&
+        typeof config?.model === "string" &&
+        config.model.startsWith(`${GATEWAY_PROVIDER_ID}/`)
+      ) {
+        text = edit(text, ["model"], previous.model ?? undefined);
+      } else if (
+        previous === undefined &&
+        typeof config?.model === "string" &&
+        config.model.startsWith(`${GATEWAY_PROVIDER_ID}/`)
+      ) {
+        text = edit(text, ["model"], undefined);
+      }
       return {
-        changes: [],
+        changes: [
+          ...change(target, before, text),
+          ...change(backup, backupBefore, undefined),
+        ],
         summary: [
-          `${target} has no "${GATEWAY_PROVIDER_ID}" provider; nothing to remove.`,
+          `${target} has no "${GATEWAY_PROVIDER_ID}" provider; restored any managed default.`,
         ],
       };
     }
     let text = edit(before, ["provider", GATEWAY_PROVIDER_ID], undefined);
+    if (
+      previous !== undefined &&
+      typeof config.model === "string" &&
+      config.model.startsWith(`${GATEWAY_PROVIDER_ID}/`)
+    ) {
+      text = edit(text, ["model"], previous.model ?? undefined);
+    } else if (
+      previous === undefined &&
+      typeof config.model === "string" &&
+      config.model.startsWith(`${GATEWAY_PROVIDER_ID}/`)
+    ) {
+      text = edit(text, ["model"], undefined);
+    }
     const rest = parseJsonc(text, target) as Record<string, unknown>;
     if (rest.provider && Object.keys(rest.provider).length === 0) {
       text = edit(text, ["provider"], undefined);
     }
     const after =
+      !previous?.configExisted &&
       Object.keys(parseJsonc(text, target) as object).length === 0 &&
       !/\/[/*]/.test(text)
         ? undefined
         : text;
     return {
-      changes: change(target, before, after),
-      summary: [`Remove provider "${GATEWAY_PROVIDER_ID}" from ${target}.`],
+      changes: [
+        ...change(target, before, after),
+        ...change(backup, backupBefore, undefined),
+      ],
+      summary: [
+        `Remove provider "${GATEWAY_PROVIDER_ID}" and restore the previous default model in ${target}.`,
+      ],
     };
   },
 };
