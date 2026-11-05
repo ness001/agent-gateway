@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8
+
+- Distinguish a missing devtunnel CLI from timeouts, launch failures, and nonzero
+  exits, with safe diagnostics instead of an incorrect "CLI not found" message.
+- Allow a full path to the devtunnel CLI with `agentGateway.devTunnel.cliPath`,
+  including paths with spaces, and use it for interactive login.
+
 ## 0.1.7
 
 - Simplify the Status panel: hide recent errors (use Open error log) and
