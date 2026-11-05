@@ -34,16 +34,13 @@ jobs:
           if [ -z "$tag_sha" ]; then
             tag_sha="$(git ls-remote --tags origin "refs/tags/$tag" | cut -f1)"
           fi
-          if [ -n "$tag_sha" ] && [ "$tag_sha" != "$sha" ]; then
-            echo "$tag already exists at $tag_sha; nothing to do."
-            exit 0
-          fi
+          target_sha="${tag_sha:-$sha}"
 
-          conclusion="$(gh run list --workflow ci.yml --commit "$sha" \
+          conclusion="$(gh run list --workflow ci.yml --commit "$target_sha" \
             --json conclusion,status \
             -q '[.[] | select(.status == "completed")][0].conclusion')"
           if [ "$conclusion" != "success" ]; then
-            echo "::error::CI has not passed for $sha (latest result: ${conclusion:-none}); refusing to create $tag."
+            echo "::error::CI has not passed for $target_sha (latest result: ${conclusion:-none}); refusing to release $tag."
             exit 1
           fi
 
@@ -52,9 +49,9 @@ jobs:
             git push origin "refs/tags/$tag"
           fi
 
-          release_run="$(gh run list --workflow release.yml --commit "$sha" \
-            --json databaseId \
-            -q '.[0].databaseId')"
+          release_run="$(gh run list --workflow release.yml --branch "$tag" \
+            --json databaseId,headSha \
+            -q "[.[] | select(.headSha == \"$target_sha\")][0].databaseId")"
           if [ -n "$release_run" ]; then
             echo "$tag already has release workflow run $release_run; nothing to do."
             exit 0
