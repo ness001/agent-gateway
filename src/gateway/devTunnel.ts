@@ -243,15 +243,65 @@ export interface FindCliOptions {
   platform?: NodeJS.Platform;
   localAppData?: string;
   exists?: (p: string) => boolean;
+  cliPath?: string;
 }
 
-/** Returns the CLI path/command to use, or undefined when it is not installed. */
+export class DevTunnelDetectionError extends Error {
+  constructor(
+    readonly kind: "timeout" | "start" | "failure",
+    readonly exitCode: number,
+    readonly detail?: string,
+  ) {
+    super(
+      kind === "timeout"
+        ? `devtunnel --version timed out after 10s. Check the CLI and retry.${detail ? ` CLI said: ${detail}` : ""}`
+        : kind === "start"
+          ? `Could not start devtunnel --version (${detail}). Check the executable path and permissions.`
+          : `devtunnel --version failed (exit code ${exitCode}).${detail ? ` CLI said: ${detail}` : ""}`,
+    );
+  }
+}
+
+/** Returns the CLI path/command to use, or undefined only when it is missing. */
 export async function findDevTunnelCli(
   opts: FindCliOptions = {},
 ): Promise<string | undefined> {
   const exec = opts.exec ?? nodeExec;
-  const onPath = await exec("devtunnel", ["--version"], 10_000);
-  if (!onPath.spawnError && onPath.code === 0) {
+  const check = async (file: string): Promise<boolean> => {
+    const result = await exec(file, ["--version"], 10_000);
+    if (result.timedOut) {
+      throw new DevTunnelDetectionError(
+        "timeout",
+        result.code,
+        sanitizeCliMessage(result.stderr) ?? sanitizeCliMessage(result.stdout),
+      );
+    }
+    if (result.spawnError) {
+      if (result.spawnError === "ENOENT" && !opts.cliPath?.trim()) {
+        return false;
+      }
+      throw new DevTunnelDetectionError(
+        "start",
+        result.code,
+        result.spawnError,
+      );
+    }
+    if (result.code !== 0) {
+      throw new DevTunnelDetectionError(
+        "failure",
+        result.code,
+        sanitizeCliMessage(result.stderr) ?? sanitizeCliMessage(result.stdout),
+      );
+    }
+    return true;
+  };
+
+  const configured = opts.cliPath?.trim();
+  if (configured) {
+    await check(configured);
+    return configured;
+  }
+  if (await check("devtunnel")) {
     return "devtunnel";
   }
   const platform = opts.platform ?? process.platform;
@@ -265,7 +315,7 @@ export async function findDevTunnelCli(
       "devtunnel.exe",
     );
     const exists = opts.exists ?? fs.existsSync;
-    if (exists(candidate)) {
+    if (exists(candidate) && (await check(candidate))) {
       return candidate;
     }
   }
