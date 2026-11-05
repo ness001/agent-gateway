@@ -230,6 +230,28 @@ suite("hermesAdapter", () => {
     }
   });
 
+  test("scalar restoration keeps model settings added after configuration", () => {
+    const plan = hermesAdapter.plan(input, {
+      [HM]: 'model: "openrouter/old-model"\n',
+    });
+    const current = plan.changes
+      .find((c) => c.path === HM)!
+      .after!.replace(
+        "  context_length: 200000\n",
+        "  context_length: 200000\n  temperature: 0.5\n",
+      );
+    const restored = hermesAdapter
+      .unplan(input, {
+        [HM]: current,
+        [HB]: plan.changes.find((c) => c.path === HB)?.after,
+      })
+      .changes.find((c) => c.path === HM)!.after!;
+    assert.deepStrictEqual(parseYaml(restored).model, {
+      temperature: 0.5,
+      default: "openrouter/old-model",
+    });
+  });
+
   test("reconfigure keeps Hermes's original default and unrelated model options", () => {
     const before =
       "model:\n  provider: openrouter\n  default: old\n  context_length: 1000000\n  temperature: 0.5\n";
@@ -344,6 +366,15 @@ suite("hermesAdapter", () => {
     assert.deepStrictEqual(removal.changes, []);
     assert.ok(removal.summary.some((line) => line.includes("kept")));
     assert.ok(removal.manualSteps?.some((line) => line.includes(HM)));
+  });
+
+  test("removal accepts a valid scalar model setting", () => {
+    const before =
+      'model: "user/selected-model"\nproviders:\n  agent-gateway:\n    api: http://127.0.0.1:24444/v1\n';
+    const removal = hermesAdapter.unplan(input, { [HM]: before });
+    const after = removal.changes.find((c) => c.path === HM)!.after!;
+    assert.strictEqual(parseYaml(after).model, "user/selected-model");
+    assert.strictEqual(parseYaml(after).providers, undefined);
   });
 
   test("rejects malformed model settings instead of discarding the backup", () => {

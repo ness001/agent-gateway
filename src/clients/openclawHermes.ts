@@ -571,9 +571,18 @@ export const hermesAdapter: ClientAdapter = {
     const backupBefore = files[backup];
     const previous = hermesPrevious(backupBefore);
     const modelBlock = doc.getIn(["model"], true);
-    if (modelBlock !== undefined && modelBlock !== null && !isMap(modelBlock)) {
+    const scalarModel =
+      typeof doc.get("model") === "string"
+        ? (doc.get("model") as string)
+        : undefined;
+    if (
+      modelBlock !== undefined &&
+      modelBlock !== null &&
+      !isMap(modelBlock) &&
+      scalarModel === undefined
+    ) {
       throw new Error(
-        `Cannot safely remove Hermes's provider: model must be a mapping.`,
+        `Cannot safely remove Hermes's provider: model must be a mapping or string.`,
       );
     }
     const providersBlock = doc.getIn(["providers"], true);
@@ -586,7 +595,9 @@ export const hermesAdapter: ClientAdapter = {
         `Cannot safely remove Hermes's provider: providers must be a mapping.`,
       );
     }
-    const currentProvider = doc.getIn(["model", "provider"]);
+    const currentProvider = isMap(modelBlock)
+      ? doc.getIn(["model", "provider"])
+      : undefined;
     const gatewaySelected =
       currentProvider === GATEWAY_PROVIDER_ID ||
       currentProvider === `custom:${GATEWAY_PROVIDER_ID}`;
@@ -606,9 +617,19 @@ export const hermesAdapter: ClientAdapter = {
     }
     if (previous.found && gatewaySelected) {
       if (previous.scalarModel !== undefined) {
-        const model = new Scalar(previous.scalarModel);
-        model.type = Scalar.QUOTE_DOUBLE;
-        doc.set("model", model);
+        const currentModel = doc.getIn(["model"], true);
+        if (isMap(currentModel)) {
+          currentModel.delete("provider");
+          currentModel.delete("default");
+          currentModel.delete("context_length");
+        }
+        if (isMap(currentModel) && currentModel.items.length > 0) {
+          currentModel.set("default", previous.scalarModel);
+        } else {
+          const model = new Scalar(previous.scalarModel);
+          model.type = Scalar.QUOTE_DOUBLE;
+          doc.set("model", model);
+        }
       } else {
         if (previous.provider === null) {
           doc.deleteIn(["model", "provider"]);
