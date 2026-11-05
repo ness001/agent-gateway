@@ -129,7 +129,9 @@ connection-check failure. You can start, manage or stop sharing from **Status**.
 
 Run **Share Gateway via Dev Tunnel** again and choose **Stop sharing** to stop
 hosting. Hosting also stops when the extension shuts down. Installation and
-sign-in may still open a terminal for interactive steps.
+sign-in may still open a terminal for interactive steps. If `devtunnel` is
+installed outside PATH or WinGet Links, set `agentGateway.devTunnel.cliPath` to
+the full executable path in VS Code settings.
 
 On the other machine, run **Manage Remote Upstreams** > **Add remote
 upstream**, paste the URL and enter the key. Its models appear as

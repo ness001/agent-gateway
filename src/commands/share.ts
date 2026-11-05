@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import {
   DEV_TUNNEL_DOCS_URL,
   DevTunnelCli,
+  DevTunnelDetectionError,
   DevTunnelError,
   DevTunnelHost,
   clientSetupText,
@@ -336,7 +337,10 @@ export async function shareViaDevTunnel(
 const TUNNEL_ID_STATE_KEY = "agentGateway.devTunnelId";
 
 function errorText(error: unknown): string {
-  if (error instanceof DevTunnelError) {
+  if (
+    error instanceof DevTunnelError ||
+    error instanceof DevTunnelDetectionError
+  ) {
     return error.message;
   }
   return "Unexpected error; see the Agent Gateway log.";
@@ -349,8 +353,18 @@ function runInTerminal(name: string, command: string): void {
   terminal.sendText(command);
 }
 
-function shellCommand(cliPath: string): string {
-  return cliPath.includes(" ") ? `& "${cliPath}"` : cliPath;
+export function devTunnelLoginOptions(cliPath: string): vscode.TerminalOptions {
+  return {
+    name: "devtunnel login",
+    shellPath: cliPath,
+    shellArgs: ["user", "login"],
+  };
+}
+
+function runDevTunnelLogin(cliPath: string): void {
+  vscode.window.terminals.find((t) => t.name === "devtunnel login")?.dispose();
+  const terminal = vscode.window.createTerminal(devTunnelLoginOptions(cliPath));
+  terminal.show();
 }
 
 async function startSharing(
@@ -365,37 +379,46 @@ async function startSharing(
     );
     return;
   }
-  const cliPath = await findDevTunnelCli();
-  if (!cliPath) {
-    logger.warn("Share via dev tunnel: devtunnel CLI not found.");
-    const pick = await vscode.window.showErrorMessage(
-      "The devtunnel CLI is not installed (not on PATH or in the WinGet links folder).",
-      "Install (winget)",
-      "Open docs",
-    );
-    if (pick === "Install (winget)") {
-      runInTerminal("Install devtunnel", "winget install Microsoft.devtunnel");
-      void vscode.window.showInformationMessage(
-        "After installation finishes, rerun 'Share Gateway via Dev Tunnel'.",
-      );
-    } else if (pick === "Open docs") {
-      void vscode.env.openExternal(vscode.Uri.parse(DEV_TUNNEL_DOCS_URL));
-    }
-    return;
-  }
-  if (cliPath !== "devtunnel") {
-    logger.info(
-      `devtunnel is not on PATH; falling back to ${cliPath} (WinGet links folder).`,
-    );
-    void vscode.window.showInformationMessage(
-      `devtunnel is not on PATH; using fallback ${cliPath}.`,
-    );
-  }
-  const cli = new DevTunnelCli(cliPath, undefined, logger);
   try {
+    const configuredPath = vscode.workspace
+      .getConfiguration("agentGateway")
+      .get<string>("devTunnel.cliPath", "")
+      .trim();
+    const cliPath = await findDevTunnelCli({ cliPath: configuredPath });
+    if (!cliPath) {
+      logger.warn(
+        "Share via dev tunnel: devtunnel CLI not found on PATH or in WinGet Links.",
+      );
+      const pick = await vscode.window.showErrorMessage(
+        "The devtunnel CLI was not found on PATH or in WinGet Links. Set agentGateway.devTunnel.cliPath to its executable path if it is installed elsewhere.",
+        "Install (winget)",
+        "Open docs",
+      );
+      if (pick === "Install (winget)") {
+        runInTerminal(
+          "Install devtunnel",
+          "winget install Microsoft.devtunnel",
+        );
+        void vscode.window.showInformationMessage(
+          "After installation finishes, rerun 'Share Gateway via Dev Tunnel'.",
+        );
+      } else if (pick === "Open docs") {
+        void vscode.env.openExternal(vscode.Uri.parse(DEV_TUNNEL_DOCS_URL));
+      }
+      return;
+    }
+    if (cliPath !== "devtunnel" && !configuredPath) {
+      logger.info(
+        "devtunnel is not on PATH; using the WinGet Links executable.",
+      );
+      void vscode.window.showInformationMessage(
+        "devtunnel is not on PATH; using the WinGet Links executable.",
+      );
+    }
+    const cli = new DevTunnelCli(cliPath, undefined, logger);
     if (!(await cli.isLoggedIn())) {
       logger.warn("Share via dev tunnel: devtunnel is not signed in.");
-      runInTerminal("devtunnel login", `${shellCommand(cliPath)} user login`);
+      runDevTunnelLogin(cliPath);
       void vscode.window.showWarningMessage(
         "devtunnel is not signed in (anonymous users cannot create tunnels). Finish 'devtunnel user login' in the terminal, then rerun 'Share Gateway via Dev Tunnel'.",
       );

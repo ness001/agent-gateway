@@ -81,6 +81,11 @@
           "default": "info",
           "description": "Gateway log level."
         },
+        "agentGateway.devTunnel.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the devtunnel executable for sharing the gateway. Empty searches PATH and WinGet Links."
+        },
         "agentGateway.remoteUpstreams": {
           "type": "array",
           "default": [],

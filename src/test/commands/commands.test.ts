@@ -13,7 +13,7 @@ import {
 import { fallbackModelItems } from "../../commands/fallback";
 import { listeningOn, validatePort } from "../../commands/port";
 import { remoteListItems, remoteStateText } from "../../commands/remotes";
-import { shareActionItems } from "../../commands/share";
+import { devTunnelLoginOptions, shareActionItems } from "../../commands/share";
 import { statusItems } from "../../commands/status";
 import { webSearchEngineItems } from "../../commands/webSearch";
 import type { HealthSnapshot } from "../../gateway/health";
@@ -40,6 +40,19 @@ function health(over: Partial<HealthSnapshot> = {}): HealthSnapshot {
     ...over,
   };
 }
+
+suite("commands/devTunnelLogin", () => {
+  test("launches a configured path with spaces and shell metacharacters as the executable", () => {
+    assert.deepStrictEqual(
+      devTunnelLoginOptions("C:\\Program Files\\Dev & Tunnel\\devtunnel.exe"),
+      {
+        name: "devtunnel login",
+        shellPath: "C:\\Program Files\\Dev & Tunnel\\devtunnel.exe",
+        shellArgs: ["user", "login"],
+      },
+    );
+  });
+});
 
 suite("commands/palette", () => {
   const pkg = JSON.parse(
