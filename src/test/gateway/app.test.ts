@@ -1025,7 +1025,7 @@ suite("Gateway app", () => {
       assert.ok(
         h.logs.some((l) =>
           l.includes(
-            `remote "box" rejected the gateway credentials (HTTP ${status}); set the key with 'Agent Gateway: Manage Remote Upstreams'`,
+            `remote "box" rejected the gateway credentials (HTTP ${status}); set the key with 'Agent Gateway: Manage Remote Gateways'`,
           ),
         ),
       );
