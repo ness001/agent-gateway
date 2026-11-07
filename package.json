@@ -132,7 +132,7 @@
             "Kagi: search and URL fetch require an API key."
           ],
           "default": "none",
-          "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Web Search and Fetch** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."
+          "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Set Web Search Engine** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."
         },
         "agentGateway.webSearch.model": {
           "type": "string",
@@ -199,7 +199,7 @@
       },
       {
         "command": "agentGateway.setWebSearchEngine",
-        "title": "Web Search and Fetch",
+        "title": "Set Web Search Engine",
         "category": "Agent Gateway"
       },
       {
@@ -209,7 +209,7 @@
       },
       {
         "command": "agentGateway.manageRemoteUpstreams",
-        "title": "Manage Remote Upstreams",
+        "title": "Manage Remote Gateways",
         "category": "Agent Gateway"
       },
       {
