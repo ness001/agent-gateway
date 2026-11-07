@@ -712,7 +712,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
         });
         if (response.status === 401 || response.status === 403) {
           deps.logger.warn(
-            `[${reqId}] remote ${logId(remote.name)} rejected the gateway credentials (HTTP ${response.status}); set the key with 'Agent Gateway: Manage Remote Upstreams'`,
+            `[${reqId}] remote ${logId(remote.name)} rejected the gateway credentials (HTTP ${response.status}); set the key with 'Agent Gateway: Manage Remote Gateways'`,
           );
         }
         return response;

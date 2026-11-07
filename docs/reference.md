@@ -181,15 +181,15 @@ can search and then call a tool (for example write a file) in the same turn.
 
 ### Engines
 
-| Engine    | Search without a key             | Fetch endpoint                        | Fetch without a key  | Key header              |
-| --------- | -------------------------------- | ------------------------------------- | -------------------- | ----------------------- |
-| Exa       | Works (public MCP, rate-limited) | MCP `web_fetch_exa`; REST `/contents` | Works                | `x-api-key`             |
-| Firecrawl | Works (rate-limited)             | `/v2/scrape`                          | Works (rate-limited) | `Authorization: Bearer` |
-| Tavily    | Needs a key                      | `/extract`                            | Needs a key          | `Authorization: Bearer` |
-| Jina AI   | Needs a key                      | Reader `r.jina.ai`                    | Works (rate-limited) | `Authorization: Bearer` |
-| You.com   | Needs a key                      | `/v1/contents`                        | Needs a key          | `X-API-Key`             |
-| Brave Search | Needs a key | Not supported | Not supported | `X-Subscription-Token` |
-| Kagi | Needs a key | `/api/v1/extract` | Needs a key | `Authorization: Bearer` |
+| Engine       | Search without a key             | Fetch endpoint                        | Fetch without a key  | Key header              |
+| ------------ | -------------------------------- | ------------------------------------- | -------------------- | ----------------------- |
+| Exa          | Works (public MCP, rate-limited) | MCP `web_fetch_exa`; REST `/contents` | Works                | `x-api-key`             |
+| Firecrawl    | Works (rate-limited)             | `/v2/scrape`                          | Works (rate-limited) | `Authorization: Bearer` |
+| Tavily       | Needs a key                      | `/extract`                            | Needs a key          | `Authorization: Bearer` |
+| Jina AI      | Needs a key                      | Reader `r.jina.ai`                    | Works (rate-limited) | `Authorization: Bearer` |
+| You.com      | Needs a key                      | `/v1/contents`                        | Needs a key          | `X-API-Key`             |
+| Brave Search | Needs a key                      | Not supported                         | Not supported        | `X-Subscription-Token`  |
+| Kagi         | Needs a key                      | `/api/v1/extract`                     | Needs a key          | `Authorization: Bearer` |
 
 Brave Search uses the [Web Search API](https://api-dashboard.search.brave.com/documentation/services/web-search) and does not support URL fetch. No other provider is contacted for fetches.
 Kagi uses the [v1 Search and Extract APIs](https://kagi.com/api/docs/openapi), not the deprecated v0 API. Both providers require their own API key and API access/billing.
@@ -265,7 +265,7 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   `[remote][<upstream-name>]`. Settings describe forwarded metadata, not what
   the remote model applied; no prompt, stop text or cache-key value is included.
   `debug` adds provider error messages.
-- **Status** > **Change log level**: select `error`, `warn`, `info`, or `debug`.
+- **Status** > **Set log level**: select `error`, `warn`, `info`, or `debug`.
   Applies immediately without restarting; updates an existing workspace override,
   otherwise your user setting. For debug output, also select Debug for the
   Agent Gateway output channel in VS Code if its log filter hides those messages.
