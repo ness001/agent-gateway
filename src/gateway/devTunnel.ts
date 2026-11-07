@@ -589,6 +589,6 @@ export function clientSetupText(hostname: string, url: string): string {
   return [
     `Name: ${sanitizeHostName(hostname)}`,
     `URL: ${url}`,
-    "Run 'Agent Gateway: Manage Remote Upstreams' on the client and pick 'Add remote upstream'.",
+    "Run 'Agent Gateway: Manage Remote Gateways' on the client and pick 'Add remote gateway'.",
   ].join("\n");
 }

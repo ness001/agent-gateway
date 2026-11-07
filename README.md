@@ -114,9 +114,9 @@ All commands are under **Agent Gateway** in the Command Palette.
 | Change Port                  | Moves the gateway to another port and offers to update your agents.              |
 | Set Fallback Model           | Manages model mappings, AI suggestions and an optional local or remote fallback. |
 | Configure Coding Agents      | Sets up, updates or removes the gateway in your agents.                          |
-| Web Search and Fetch         | Chooses the web search engine and its API key.                                   |
+| Set Web Search Engine        | Chooses the web search engine and its API key.                                   |
 | Share Gateway via Dev Tunnel | Shares your gateway with another machine and manages the gateway API key.        |
-| Manage Remote Upstreams      | Adds, tests or removes another machine's gateway.                                |
+| Manage Remote Gateways       | Adds, tests or removes another machine's gateway.                                |
 
 ## Share models between machines
 
@@ -136,8 +136,8 @@ sign-in may still open a terminal for interactive steps. If `devtunnel` is
 installed outside PATH or WinGet Links, set `agentGateway.devTunnel.cliPath` to
 the full executable path in VS Code settings.
 
-On the other machine, run **Manage Remote Upstreams** > **Add remote
-upstream**, paste the URL and enter the key. Its models appear as
+On the other machine, run **Manage Remote Gateways** > **Add remote
+gateway**, paste the URL and enter the key. Its models appear as
 `<name>--<model>`.
 
 > Anyone with the tunnel URL and key can use your Copilot models. Always set a
@@ -145,19 +145,19 @@ upstream**, paste the URL and enter the key. Its models appear as
 
 ## Web search and URL fetch
 
-Web search is off until you turn it on. Run **Web Search and Fetch**, pick an
+Web search is off until you turn it on. Run **Set Web Search Engine**, pick an
 engine, and enter its API key, or leave the key empty to use the engine's
 free anonymous endpoint where there is one.
 
-| Engine    | Without a key                   |
-| --------- | ------------------------------- |
-| Exa       | Search and fetch (rate-limited) |
-| Firecrawl | Search and fetch (rate-limited) |
-| Jina AI   | Fetch only                      |
-| Tavily    | Needs a key                     |
-| You.com   | Needs a key                     |
-| Brave Search | Needs a key (search only)     |
-| Kagi      | Needs a key                     |
+| Engine       | Without a key                   |
+| ------------ | ------------------------------- |
+| Exa          | Search and fetch (rate-limited) |
+| Firecrawl    | Search and fetch (rate-limited) |
+| Jina AI      | Fetch only                      |
+| Tavily       | Needs a key                     |
+| You.com      | Needs a key                     |
+| Brave Search | Needs a key (search only)       |
+| Kagi         | Needs a key                     |
 
 Keys are stored in VS Code secret storage, never in `settings.json`. For Codex,
 the command also offers to turn on its live search (`web_search = "live"`).
@@ -170,8 +170,8 @@ Search queries, results and page text are never logged.
 | `agentGateway.enabled`                         | `true`              | Run the gateway.                                                    |
 | `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                |
 | `agentGateway.logLevel`                        | `info`              | `error`, `warn`, `info` or `debug`.                                 |
-| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Upstreams**).  |
-| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Web Search and Fetch**).            |
+| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).   |
+| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).           |
 | `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                   |
 | `agentGateway.webSearch.model`                 | `""`                | Model for Gemini CLI search requests when its model is unknown.     |
 | `agentGateway.modelMappings`                   | Two empty mappings¹ | Map requested names to local models through **Set Fallback Model**. |
@@ -223,7 +223,7 @@ Code have no such servers, so the gateway runs what it can itself:
 
 | Server tool                                                                                             | Through the gateway                                                                                       |
 | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Web search (Anthropic `web_search`, OpenAI `web_search`, Gemini `googleSearch`)                         | Run by the gateway through the engine you pick in **Web Search and Fetch**. Off until you pick one.       |
+| Web search (Anthropic `web_search`, OpenAI `web_search`, Gemini `googleSearch`)                         | Run by the gateway through the engine you pick in **Set Web Search Engine**. Off until you pick one.      |
 | Gemini URL context (`urlContext`, Gemini CLI's `web_fetch`)                                             | Run by the gateway, unless the same request also has the agent's own tools.                               |
 | Anthropic `web_fetch`                                                                                   | Run by the gateway with the same engine. Only pages whose URL is already in the conversation are fetched. |
 | Code execution (Anthropic `code_execution`, OpenAI code interpreter, Gemini `codeExecution`)            | Not supported. Left out (Anthropic: the request fails).                                                   |

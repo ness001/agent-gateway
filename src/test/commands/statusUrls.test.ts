@@ -59,8 +59,8 @@ suite("commands/status sharing", () => {
       assert.strictEqual(
         items.find((i) => i.action === "share")?.label,
         state.status === "inactive"
-          ? "$(radio-tower) Start sharing via dev tunnel"
-          : "$(radio-tower) Manage sharing via dev tunnel",
+          ? "$(radio-tower) Share gateway via dev tunnel"
+          : "$(radio-tower) Manage dev tunnel sharing",
       );
       if (state.status === "connected") {
         assert.strictEqual(line?.detail, "Last connection check succeeded.");
@@ -198,7 +198,7 @@ suite("commands/status sharing", () => {
       statusItems(health(), "info", connection.state).find(
         (item) => item.action === "share",
       )?.label,
-      "$(radio-tower) Manage sharing via dev tunnel",
+      "$(radio-tower) Manage dev tunnel sharing",
     );
   });
 

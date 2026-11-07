@@ -92,9 +92,9 @@ suite("commands/palette", () => {
         "changePort=Change Port",
         "setFallbackModel=Set Fallback Model",
         "configureClients=Configure Coding Agents",
-        "setWebSearchEngine=Web Search and Fetch",
+        "setWebSearchEngine=Set Web Search Engine",
         "shareViaDevTunnel=Share Gateway via Dev Tunnel",
-        "manageRemoteUpstreams=Manage Remote Upstreams",
+        "manageRemoteUpstreams=Manage Remote Gateways",
       ]
         .map((c) => CMD + c)
         .sort(),
@@ -167,22 +167,22 @@ suite("commands/status", () => {
     assert.ok(!items.some((i) => i.description?.startsWith("request ")));
     assert.ok(!items.some((i) => i.url));
     assert.deepStrictEqual(
-      items.filter((i) => i.action).map((i) => i.action),
+      items.filter((i) => i.action).map((i) => [i.action, i.label]),
       [
-        "models",
-        "apiUrls",
-        "restart",
-        "changePort",
-        "fallbackModel",
-        "copyHealth",
-        "openErrorLog",
-        "showLog",
-        "logLevel",
-        "setApiKey",
-        "remotes",
-        "share",
-        "webSearch",
-        "clients",
+        ["models", "Models: 3"],
+        ["apiUrls", "$(link) API URLs"],
+        ["restart", "$(debug-restart) Restart gateway"],
+        ["changePort", "$(plug) Change port"],
+        ["fallbackModel", "$(arrow-swap) Set fallback model"],
+        ["copyHealth", "$(copy) Copy health details"],
+        ["openErrorLog", "$(file) Open error log"],
+        ["showLog", "$(output) Open output log"],
+        ["logLevel", "$(settings-gear) Set log level"],
+        ["setApiKey", "$(key) Set gateway API key"],
+        ["remotes", "$(remote) Manage remote gateways"],
+        ["share", "$(radio-tower) Share gateway via dev tunnel"],
+        ["webSearch", "$(search) Set web search engine"],
+        ["clients", "$(gear) Configure coding agents"],
       ],
     );
   });
@@ -268,7 +268,7 @@ suite("commands/remotes", () => {
       [{ name: "a", url: "https://a", status: "ready", modelCount: 1 }],
     );
     assert.strictEqual(items[0].name, undefined);
-    assert.match(items[0].label, /Add remote upstream/);
+    assert.match(items[0].label, /Add remote gateway/);
     assert.deepStrictEqual(
       items.slice(1).map((i) => [i.name, i.description, i.detail]),
       [

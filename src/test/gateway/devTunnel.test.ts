@@ -350,7 +350,7 @@ suite("devTunnel", () => {
     const text = clientSetupText("My PC#1", "https://x-1.jpe1.devtunnels.ms");
     assert.match(text, /Name: My-PC-1/);
     assert.match(text, /URL: https:\/\/x-1\.jpe1\.devtunnels\.ms/);
-    assert.match(text, /Manage Remote Upstreams/);
+    assert.match(text, /Manage Remote Gateways.*Add remote gateway/);
   });
 });
 

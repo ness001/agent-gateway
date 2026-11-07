@@ -184,7 +184,7 @@ suite("protocol/hosted wiring (decoders)", () => {
         }),
       (e: { kind?: string; message?: string }) =>
         e.kind === "tool_unavailable" &&
-        /Web Search and Fetch/.test(e.message ?? ""),
+        /Set Web Search Engine/.test(e.message ?? ""),
     );
   });
 
@@ -716,7 +716,7 @@ suite("protocol/hosted wiring (handlers)", () => {
       error: { status: string; message: string };
     };
     assert.equal(j.error.status, "FAILED_PRECONDITION");
-    assert.match(j.error.message, /Agent Gateway: Web Search and Fetch/);
+    assert.match(j.error.message, /Agent Gateway: Set Web Search Engine/);
     assert.equal(m.calls(), 0);
   });
 

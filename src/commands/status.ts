@@ -101,12 +101,12 @@ const ACTIONS: [StatusAction, string, string?][] = [
   ["fallbackModel", "$(arrow-swap) Set fallback model"],
   ["copyHealth", "$(copy) Copy health details"],
   ["openErrorLog", "$(file) Open error log", "Failed requests, last 7 days"],
-  ["showLog", "$(output) Show output log"],
-  ["logLevel", "$(settings-gear) Change log level"],
+  ["showLog", "$(output) Open output log"],
+  ["logLevel", "$(settings-gear) Set log level"],
   ["setApiKey", "$(key) Set gateway API key"],
-  ["remotes", "$(remote) Manage remote upstreams"],
-  ["share", "$(radio-tower) Start sharing via dev tunnel"],
-  ["webSearch", "$(search) Web search and fetch"],
+  ["remotes", "$(remote) Manage remote gateways"],
+  ["share", "$(radio-tower) Share gateway via dev tunnel"],
+  ["webSearch", "$(search) Set web search engine"],
   ["clients", "$(gear) Configure coding agents"],
 ];
 
@@ -163,7 +163,7 @@ export function statusItems(
     ...ACTIONS.map(([action, label, description]) => ({
       label:
         action === "share" && sharing.status !== "inactive"
-          ? "$(radio-tower) Manage sharing via dev tunnel"
+          ? "$(radio-tower) Manage dev tunnel sharing"
           : label,
       description:
         action === "logLevel"

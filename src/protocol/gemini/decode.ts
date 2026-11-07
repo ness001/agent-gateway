@@ -31,7 +31,7 @@ const URL_CONTEXT_KEYS = ["urlContext", "url_context"] as const;
 
 /** Message for a Gemini request whose only tools are search tools. */
 export const NO_SEARCH_PROVIDER_MESSAGE =
-  'Web search is not configured. Run the "Agent Gateway: Web Search and Fetch" command to choose a search provider.';
+  'Web search is not configured. Run the "Agent Gateway: Set Web Search Engine" command to choose a search provider.';
 
 export interface GeminiDecodeContext {
   /** Resolved local model id. */
@@ -402,7 +402,7 @@ function hostedFor(
   }
   if (d.search && !hostedSearch) {
     logger?.info(
-      "gemini dropped googleSearch: no web search engine is set (run Web Search and Fetch)",
+      "gemini dropped googleSearch: no web search engine is set (run Set Web Search Engine)",
     );
   }
   // urlContext mixed with function declarations is dropped.

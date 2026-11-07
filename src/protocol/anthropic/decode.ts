@@ -455,7 +455,7 @@ function decodeToolChoice(
           // A forced hosted tool that cannot run.
           throw new GatewayError(
             "tool_unavailable",
-            `tool_choice.name: hosted tool ${h.type} is not available; configure a provider with the "Agent Gateway: Web Search and Fetch" command`,
+            `tool_choice.name: hosted tool ${h.type} is not available; configure a provider with the "Agent Gateway: Set Web Search Engine" command`,
             { param: "tool_choice.name" },
           );
         }
@@ -593,7 +593,7 @@ export function decodeMessagesRequest(
     .map((h) => h.type);
   if (droppedHosted.length) {
     opts.logger?.info(
-      `anthropic dropped server tools: ${[...new Set(droppedHosted)].join(", ")} (configured provider does not support these tools; run Web Search and Fetch)`,
+      `anthropic dropped server tools: ${[...new Set(droppedHosted)].join(", ")} (configured provider does not support these tools; run Set Web Search Engine)`,
     );
   }
   if (
