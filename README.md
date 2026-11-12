@@ -165,17 +165,17 @@ Search queries, results and page text are never logged.
 
 ## Settings
 
-| Setting                                        | Default             | Description                                                         |
-| ---------------------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `agentGateway.enabled`                         | `true`              | Run the gateway.                                                    |
-| `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                |
-| `agentGateway.logLevel`                        | `info`              | `error`, `warn`, `info` or `debug`.                                 |
-| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).   |
-| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).           |
-| `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                   |
-| `agentGateway.webSearch.model`                 | `""`                | Model for Gemini CLI search requests when its model is unknown.     |
-| `agentGateway.modelMappings`                   | Two empty mappings¹ | Map requested names to local models through **Set Fallback Model**. |
-| `agentGateway.fallbackModel`                   | `""`                | Model for unknown model names (managed by **Set Fallback Model**).  |
+| Setting                                        | Default             | Description                                                                   |
+| ---------------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `agentGateway.enabled`                         | `true`              | Run the gateway.                                                              |
+| `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                          |
+| `agentGateway.logLevel`                        | `info`              | `error`, `warn`, `info` or `debug`.                                           |
+| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).             |
+| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).                     |
+| `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                             |
+| `agentGateway.webSearch.model`                 | `""`                | Model for Gemini CLI search requests when its model is unknown.               |
+| `agentGateway.modelMappings`                   | Two empty mappings¹ | Map requested names to local or remote models through **Set Fallback Model**. |
+| `agentGateway.fallbackModel`                   | `""`                | Model for unknown model names (managed by **Set Fallback Model**).            |
 
 ¹ The default mapping keys are `claude-haiku-5.5` and `claude-sonnet-5`, both
 empty. They do not force a replacement model.
@@ -207,7 +207,7 @@ to save. Existing mappings stay unchanged unless you select replacements.
 Canceling saves nothing; saved mappings apply without restarting the gateway.
 
 The advisor receives model names and metadata—not files or conversations—and
-uses Copilot quota. Suggestions target compatible local models, not remote models;
+uses Copilot quota. Suggestions can target compatible local or remote models;
 they are recommendations, not benchmark rankings.
 
 See [mapping details](docs/reference.md#unknown-models-and-aliases) for defaults,

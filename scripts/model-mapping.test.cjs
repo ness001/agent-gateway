@@ -6,7 +6,7 @@ const { buildRegistry } = require("../out/gateway/catalog");
 const { toModelInfo } = require("../out/gateway/discovery");
 const catalog = buildRegistry(
   [toModelInfo({ id: "fast" }), toModelInfo({ id: "balanced" })],
-  [],
+  [{ name: "box", models: [toModelInfo({ id: "remote-model" })] }],
 );
 let aliases,
   writes,
@@ -309,6 +309,32 @@ for (const cancelled of [true, false]) {
     }
   });
 }
+test("manual mapping lists and saves remote targets", async () => {
+  reset();
+  const pick = vscode.window.showQuickPick;
+  vscode.window.showQuickPick = async (items, options) => {
+    if (options.title === "Fallback model for unknown model names")
+      return items.find(
+        (i) => i.action === "editMapping" && i.id === "claude-haiku-5.5",
+      );
+    const remote = items.find((i) => i.id === "box--remote-model");
+    assert.ok(remote, "remote model should be offered as a mapping target");
+    return remote;
+  };
+  try {
+    await setFallbackModel(gw);
+    assert.deepEqual(writes, [
+      [
+        "modelMappings",
+        { ...aliases, "claude-haiku-5.5": "box--remote-model" },
+        1,
+      ],
+    ]);
+    assert.equal(errors.length, 0);
+  } finally {
+    vscode.window.showQuickPick = pick;
+  }
+});
 test("empty catalog still lets users clear a stale mapping", async () => {
   reset();
   aliases = { "claude-haiku-5.5": "removed" };

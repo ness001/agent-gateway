@@ -759,6 +759,31 @@ suite("Gateway app", () => {
     );
   });
 
+  test("mapped Claude names forward to remote models with the upstream ID", async () => {
+    const h = harness();
+    h.deps.getModelAliases = () => ({
+      "claude-haiku-5.5": "box--gpt-5-remote",
+      "claude-sonnet-5": "box--gpt-5-remote",
+    });
+    const app = createGatewayApp(h.deps);
+    for (const source of ["claude-haiku-5.5", "claude-sonnet-5"]) {
+      const response = await app.fetch(
+        post("/v1/messages", { model: source, messages: [] }),
+      );
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(
+        response.headers.get("x-agent-gateway-model-fallback"),
+        `${source} -> box--gpt-5-remote; reason=model alias`,
+      );
+    }
+    assert.strictEqual(h.local.length, 0);
+    assert.strictEqual(h.remote.length, 2);
+    for (const req of h.remote) {
+      assert.strictEqual(req.url, "http://remote.test/v1/messages");
+      assert.strictEqual(JSON.parse(req.body!).model, "gpt-5-remote");
+    }
+  });
+
   test("the exact Gemini CLI web-fetch request resolves through the alias", async () => {
     const h = harness();
     h.deps.getFallbackModel = () => "gpt-6-astra";

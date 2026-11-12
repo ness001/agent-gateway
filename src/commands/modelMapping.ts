@@ -189,11 +189,9 @@ export async function editModelMapping(
     const before = config.get<Record<string, string>>("modelMappings", {});
     const current = before[source] ?? "";
     const snapshot = JSON.stringify(before);
-    // Aliases are shared across protocols; local native targets remain editable
+    // Aliases are shared across protocols; native targets remain editable
     // even when they are not eligible for AI's Anthropic-specific recommendations.
-    const candidates = gw
-      .nativeModels()
-      .filter((m) => m.remote === undefined && !m.isAlias);
+    const candidates = gw.nativeModels().filter((m) => !m.isAlias);
     const selected = await vscode.window.showQuickPick(
       [
         {
@@ -225,11 +223,7 @@ export async function editModelMapping(
     }
     if (
       selected.id &&
-      !gw
-        .nativeModels()
-        .some(
-          (m) => m.id === selected.id && m.remote === undefined && !m.isAlias,
-        )
+      !gw.nativeModels().some((m) => m.id === selected.id && !m.isAlias)
     ) {
       throw new Error("Selected model is no longer available.");
     }
