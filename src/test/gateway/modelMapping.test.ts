@@ -45,14 +45,14 @@ suite("gateway AI model mapping", () => {
       assert.throws(() => mappingSources(input));
     }
   });
-  test("candidates exclude aliases, remotes, incompatible operations and unsupported tools", () => {
+  test("candidates include compatible remote models but exclude aliases and incompatible models", () => {
     assert.deepStrictEqual(
       mappingCandidates([
         ...models,
         { ...models[0], id: "no-tools", supportsToolCalling: false },
         { ...models[0], id: "no-api", operations: [] },
       ]).map((m) => m.id),
-      ["fast", "balanced"],
+      ["fast", "balanced", "remote--remote-model"],
     );
   });
   test("prompt includes only whitelisted catalog metadata", () => {
@@ -61,7 +61,6 @@ suite("gateway AI model mapping", () => {
     ]);
     assert.ok(prompt.includes("claude-haiku-5.5"));
     assert.ok(!prompt.includes("PRIVATE"));
-    assert.ok(!prompt.includes("remote-model"));
   });
   test("parses JSON and fenced JSON and routes requested agent names", () => {
     for (const text of [
@@ -88,17 +87,26 @@ suite("gateway AI model mapping", () => {
       );
     }
   });
+  test("accepts a compatible remote target for AI suggestions", () => {
+    const suggested = [
+      { ...mappings[0], target: "remote--remote-model" },
+      mappings[1],
+    ];
+    assert.deepStrictEqual(
+      parseMappings(JSON.stringify({ mappings: suggested }), sources, models),
+      suggested,
+    );
+  });
   test("rejects invented targets, sources, duplicate entries, missing entries and invalid output", () => {
     for (const text of [
       "oops",
       "x".repeat(32001),
       "null",
       JSON.stringify({ mappings: [] }),
-      ...["invented", "remote--remote-model", "gateway-claude-fast"].map(
-        (target) =>
-          JSON.stringify({
-            mappings: [{ ...mappings[0], target }, mappings[1]],
-          }),
+      ...["invented", "gateway-claude-fast"].map((target) =>
+        JSON.stringify({
+          mappings: [{ ...mappings[0], target }, mappings[1]],
+        }),
       ),
       JSON.stringify({ mappings: [mappings[0], mappings[0]] }),
       JSON.stringify({

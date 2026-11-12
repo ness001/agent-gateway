@@ -155,9 +155,9 @@ not select a different model. Errors from an existing model do not trigger fallb
 Gemini requests do not fall back, except through aliases. **Status** and `/health`
 (`fallbackModel`) show the model in use.
 
-`agentGateway.modelMappings` maps a requested name to one of your models for
-every API, for example `{"my-model": "gpt-5.6-sol"}`. Built-in aliases cover
-Gemini CLI's internal model names (`gemini-3-flash-preview`,
+`agentGateway.modelMappings` maps a requested name to a local or remote model
+that supports the requested API, for example `{"my-model": "gpt-5.6-sol"}`.
+Built-in aliases cover Gemini CLI's internal model names (`gemini-3-flash-preview`,
 `gemini-2.5-flash`, `gemini-2.5-flash-lite` and Antigravity CLI's
 `gemini-3.1-flash-lite-preview` go to your best Gemini Flash model;
 `gemini-3-pro-preview` and `gemini-2.5-pro` to your best Gemini Pro model;
