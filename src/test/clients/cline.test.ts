@@ -85,6 +85,38 @@ suite("clients/cline", () => {
     assert.deepStrictEqual(second.changes, []);
   });
 
+  test("equivalent reordered settings do not rewrite or refresh timestamps", () => {
+    const first = clineAdapter.plan(input(), {}).changes[0].after!;
+    const file = JSON.parse(first);
+    file.providers["openai-compatible"].settings = Object.fromEntries(
+      Object.entries(file.providers["openai-compatible"].settings).reverse(),
+    );
+    const reordered = JSON.stringify(file);
+    assert.deepStrictEqual(
+      clineAdapter.plan(input(), { [target]: reordered }).changes,
+      [],
+    );
+  });
+
+  test("owned entry is removable after a port change, foreign entries remain untouched", () => {
+    const configured = clineAdapter.plan(input(), {}).changes[0].after!;
+    assert.strictEqual(
+      clineAdapter.unplan(input({ gatewayUrl: "http://127.0.0.1:25555" }), {
+        [target]: configured,
+      }).changes.length,
+      1,
+    );
+    const foreign = JSON.parse(configured);
+    delete foreign.providers["openai-compatible"].agentGateway;
+    foreign.providers["openai-compatible"].settings.baseUrl =
+      "http://127.0.0.1:9999/v1";
+    assert.deepStrictEqual(
+      clineAdapter.unplan(input(), { [target]: JSON.stringify(foreign) })
+        .changes,
+      [],
+    );
+  });
+
   test("warns when replacing a foreign openai-compatible entry", () => {
     const foreign = JSON.stringify({
       version: 1,

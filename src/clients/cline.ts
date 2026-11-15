@@ -1,10 +1,10 @@
 import * as path from "path";
 
+import { gatewayApiKey, gatewayV1Url } from "./defaults";
 import {
   type ClientAdapter,
   type ClientConfigInput,
   type ClientPlan,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 // Cline CLI (v3) keeps provider settings in ~/.cline/data/settings/providers.json,
@@ -17,6 +17,8 @@ interface ProviderEntry {
   settings: Record<string, unknown>;
   updatedAt: string;
   tokenSource?: string;
+  /** Marks only entries this adapter wrote; never infer ownership from a loopback URL. */
+  agentGateway?: { baseUrl: string };
 }
 
 interface ProvidersFile {
@@ -45,7 +47,7 @@ function providersPath(home: string, platform: NodeJS.Platform): string {
 }
 
 function baseUrl(input: ClientConfigInput): string {
-  return `${input.gatewayUrl.replace(/\/+$/, "")}/v1`;
+  return gatewayV1Url(input);
 }
 
 function change(
@@ -88,7 +90,25 @@ function isGatewayEntry(
   entry: ProviderEntry | undefined,
   input: ClientConfigInput,
 ): boolean {
-  return entry?.settings?.baseUrl === baseUrl(input);
+  if (entry?.settings?.baseUrl === baseUrl(input)) {
+    return true;
+  }
+  if (
+    !entry?.agentGateway?.baseUrl ||
+    entry.agentGateway.baseUrl !== entry.settings?.baseUrl
+  ) {
+    return false;
+  }
+  try {
+    const url = new URL(entry.agentGateway.baseUrl);
+    return (
+      url.protocol === "http:" &&
+      url.hostname === "127.0.0.1" &&
+      url.pathname === "/v1"
+    );
+  } catch {
+    return false;
+  }
 }
 
 export const clineAdapter: ClientAdapter = {
@@ -109,19 +129,28 @@ export const clineAdapter: ClientAdapter = {
     const file = read(before, target);
     const settings = {
       provider: PROVIDER,
-      apiKey: input.apiKey || PLACEHOLDER_API_KEY,
+      apiKey: gatewayApiKey(input),
       model: input.defaultModel,
       baseUrl: baseUrl(input),
     };
     const current = file.providers[PROVIDER];
     const same =
       current !== undefined &&
-      JSON.stringify(current.settings) === JSON.stringify(settings);
+      Object.entries(settings).every(
+        ([key, value]) => current.settings[key] === value,
+      );
+    if (same && file.lastUsedProvider === PROVIDER) {
+      return {
+        changes: [],
+        summary: ["Cline matches the shared gateway defaults."],
+      };
+    }
     if (!same) {
       file.providers[PROVIDER] = {
         settings,
         updatedAt: new Date().toISOString(),
         tokenSource: "manual",
+        agentGateway: { baseUrl: baseUrl(input) },
       };
     }
     file.lastUsedProvider = PROVIDER;

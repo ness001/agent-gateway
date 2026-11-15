@@ -2,11 +2,11 @@ import * as vscode from "vscode";
 
 import { currentRequestContext } from "../gateway/requestContext";
 
-export type LogLevel = "error" | "warn" | "info" | "debug";
+export type LogLevel = "error" | "warning" | "info" | "debug";
 
 const LEVEL_RANK: Record<LogLevel, number> = {
   error: 0,
-  warn: 1,
+  warning: 1,
   info: 2,
   debug: 3,
 };
@@ -54,7 +54,7 @@ export class Logger {
   }
 
   warn(message: string, ...args: any[]): void {
-    if (this.enabled("warn")) {
+    if (this.enabled("warning")) {
       this.outputChannel.warn(this.tag(message), ...args);
     }
   }

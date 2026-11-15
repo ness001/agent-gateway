@@ -4,8 +4,6 @@ import * as vscode from "vscode";
 import type { Gateway } from "../gateway/gateway";
 import type { HealthSnapshot } from "../gateway/health";
 import { CONFIG_SECTION, type GatewayLogLevel } from "../utils/config";
-import { logger } from "../utils/logger";
-import { changeLogLevel } from "./logLevel";
 import { remoteStateText } from "./remotes";
 import {
   type DevTunnelSharingState,
@@ -19,7 +17,6 @@ export type StatusAction =
   | "changePort"
   | "fallbackModel"
   | "models"
-  | "copyHealth"
   | "openErrorLog"
   | "showLog"
   | "logLevel"
@@ -95,11 +92,67 @@ export function apiUrlItems(h: HealthSnapshot): StatusItem[] {
   ];
 }
 
+export const STATUS_COMMANDS: Record<StatusAction, string> = {
+  apiUrls: "agentGateway.showApiUrls",
+  restart: "agentGateway.restart",
+  changePort: "agentGateway.changePort",
+  fallbackModel: "agentGateway.setFallbackModel",
+  models: "agentGateway.showModels",
+  openErrorLog: "agentGateway.openErrorLog",
+  showLog: "agentGateway.showOutput",
+  logLevel: "agentGateway.setLogLevel",
+  setApiKey: "agentGateway.setGatewayApiKey",
+  remotes: "agentGateway.manageRemoteUpstreams",
+  share: "agentGateway.shareViaDevTunnel",
+  webSearch: "agentGateway.setWebSearchEngine",
+  clients: "agentGateway.configureClients",
+};
+
+export const STATUS_GROUPS = [
+  {
+    id: "agentSetup",
+    label: "Agent Setup",
+    actions: ["clients", "fallbackModel", "webSearch"],
+  },
+  {
+    id: "connections",
+    label: "Connections",
+    actions: ["remotes", "share", "setApiKey", "apiUrls", "changePort"],
+  },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    actions: ["showLog", "openErrorLog", "logLevel"],
+  },
+] as const satisfies readonly {
+  id: string;
+  label: string;
+  actions: readonly StatusAction[];
+}[];
+
+export async function showStatusGroup(
+  id: (typeof STATUS_GROUPS)[number]["id"],
+): Promise<void> {
+  const group = STATUS_GROUPS.find((g) => g.id === id)!;
+  const picked = await vscode.window.showQuickPick(
+    group.actions.map((action) => ({
+      label:
+        action === "apiUrls"
+          ? "$(link) API URLs"
+          : ACTIONS.find(([key]) => key === action)![1],
+      action,
+    })),
+    { title: `Agent Gateway: ${group.label}` },
+  );
+  if (picked) {
+    await vscode.commands.executeCommand(STATUS_COMMANDS[picked.action]);
+  }
+}
+
 const ACTIONS: [StatusAction, string, string?][] = [
   ["restart", "$(debug-restart) Restart gateway"],
   ["changePort", "$(plug) Change port"],
   ["fallbackModel", "$(arrow-swap) Set fallback model"],
-  ["copyHealth", "$(copy) Copy health details"],
   ["openErrorLog", "$(file) Open error log", "Failed requests, last 7 days"],
   ["showLog", "$(output) Open output log"],
   ["logLevel", "$(settings-gear) Set log level"],
@@ -141,9 +194,6 @@ export function statusItems(
           description: h.fallbackModelSource ?? undefined,
         }
       : { label: "Fallback model: none" },
-    {
-      label: `Copilot Chat: ${h.copilot.installed ? (h.copilot.active ? "active" : "installed, inactive") : "not installed"}`,
-    },
     ...h.remotes.map((r) => ({
       label: `Remote ${r.name}: ${remoteStateText(r)}`,
     })),
@@ -173,6 +223,10 @@ export function statusItems(
             : description,
       action,
     })),
+    {
+      label: `Copilot Chat: ${h.copilot.installed ? (h.copilot.active ? "active" : "installed, inactive") : "not installed"}`,
+    },
+    { label: `Extension version: ${h.bridgeVersion}` },
   ];
 }
 
@@ -185,26 +239,47 @@ export async function openErrorLog(gw: Gateway): Promise<void> {
     return;
   }
   await gw.errorJournal.flush();
-  const day = new Date().toISOString().slice(0, 10);
-  const today = vscode.Uri.file(path.join(dir, `errors-${day}.jsonl`));
+  const directory = vscode.Uri.file(dir);
+  let entries: [string, vscode.FileType][];
   try {
-    await vscode.workspace.fs.stat(today);
-    await vscode.window.showTextDocument(today, { preview: true });
-  } catch {
-    // No failures today: open the folder that holds earlier days.
-    await vscode.commands.executeCommand(
-      "revealFileInOS",
-      vscode.Uri.file(dir),
-    );
+    entries = await vscode.workspace.fs.readDirectory(directory);
+  } catch (error) {
+    if (
+      !(error instanceof vscode.FileSystemError) ||
+      error.code !== "FileNotFound"
+    ) {
+      throw error;
+    }
+    entries = [];
   }
+  const names = entries
+    .filter(
+      ([name, type]) =>
+        type === vscode.FileType.File &&
+        /^errors-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name),
+    )
+    .map(([name]) => name)
+    .sort();
+  const today = `errors-${new Date().toISOString().slice(0, 10)}.jsonl`;
+  const name = names.includes(today) ? today : names.at(-1);
+  if (name) {
+    await vscode.window.showTextDocument(
+      vscode.Uri.file(path.join(dir, name)),
+      { preview: true },
+    );
+    return;
+  }
+  const document = await vscode.workspace.openTextDocument({
+    language: "jsonl",
+    content: "",
+  });
+  await vscode.window.showTextDocument(document, { preview: true });
+  void vscode.window.showInformationMessage(
+    "No gateway errors have been recorded in this window. This empty document is not a saved log file.",
+  );
 }
 
-export async function copyHealth(gw: Gateway): Promise<void> {
-  await vscode.env.clipboard.writeText(JSON.stringify(gw.health(), null, 2));
-  void vscode.window.showInformationMessage("Gateway health copied.");
-}
-
-async function showModels(gw: Gateway): Promise<void> {
+export async function showModels(gw: Gateway): Promise<void> {
   const models = gw.nativeModels();
   if (models.length === 0) {
     void vscode.window.showInformationMessage("No models discovered yet.");
@@ -232,7 +307,7 @@ async function showModels(gw: Gateway): Promise<void> {
   }
 }
 
-async function showApiUrls(gw: Gateway): Promise<void> {
+export async function showApiUrls(gw: Gateway): Promise<void> {
   const picked = await vscode.window.showQuickPick(apiUrlItems(gw.health()), {
     title: "Gateway API URLs — select to copy",
     matchOnDescription: true,
@@ -245,10 +320,7 @@ async function showApiUrls(gw: Gateway): Promise<void> {
 
 export async function showStatus(
   gw: Gateway,
-  run: Record<
-    Exclude<StatusAction, "showLog" | "logLevel" | "models" | "apiUrls">,
-    () => Thenable<unknown>
-  >,
+  run?: Partial<Record<StatusAction, () => Thenable<unknown>>>,
 ): Promise<void> {
   const level = vscode.workspace
     .getConfiguration(CONFIG_SECTION)
@@ -266,21 +338,10 @@ export async function showStatus(
   if (!picked?.action) {
     return;
   }
-  if (picked.action === "apiUrls") {
-    await showApiUrls(gw);
-    return;
+  const handler = run?.[picked.action];
+  if (handler) {
+    await handler();
+  } else {
+    await vscode.commands.executeCommand(STATUS_COMMANDS[picked.action]);
   }
-  if (picked.action === "models") {
-    await showModels(gw);
-    return;
-  }
-  if (picked.action === "showLog") {
-    logger.show();
-    return;
-  }
-  if (picked.action === "logLevel") {
-    await changeLogLevel();
-    return;
-  }
-  await run[picked.action]();
 }

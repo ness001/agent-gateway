@@ -71,7 +71,6 @@ suite("commands/palette", () => {
   const hiddenIds = [
     "setApiKey",
     "setRemoteApiKey",
-    "copyHealth",
     "openErrorLog",
     "addRemoteUpstream",
     "removeRemoteUpstream",
@@ -79,7 +78,7 @@ suite("commands/palette", () => {
     "setWebSearchApiKey",
   ].map((c) => CMD + c);
 
-  test("visible palette commands are exactly the eight consolidated ones", () => {
+  test("visible palette commands retain existing actions and include the sidebar", () => {
     const visible = pkg.contributes.commands
       .filter((c) => !hidden.has(c.command))
       .map((c) => `${c.command}=${c.title}`)
@@ -87,14 +86,12 @@ suite("commands/palette", () => {
     assert.deepStrictEqual(
       visible,
       [
+        "openSidebar=Open Sidebar",
+        "agentSetup=Agent Setup",
+        "connections=Connections",
+        "diagnostics=Diagnostics",
         "showStatus=Status",
         "restart=Restart Gateway",
-        "changePort=Change Port",
-        "setFallbackModel=Set Fallback Model",
-        "configureClients=Configure Coding Agents",
-        "setWebSearchEngine=Set Web Search Engine",
-        "shareViaDevTunnel=Share Gateway via Dev Tunnel",
-        "manageRemoteUpstreams=Manage Remote Gateways",
       ]
         .map((c) => CMD + c)
         .sort(),
@@ -109,9 +106,11 @@ suite("commands/palette", () => {
       .map((f) => fs.readFileSync(path.join(ROOT, "src", f), "utf8"))
       .join("\n");
     const registered = new Set(
-      [...source.matchAll(/registerCommand\(\s*`\$\{CMD\}\.(\w+)`/g)].map(
-        (m) => CMD + m[1],
-      ),
+      [
+        ...source.matchAll(
+          /registerCommand\(\s*(?:`\$\{CMD\}\.(\w+)`|"agentGateway\.(\w+)")/g,
+        ),
+      ].map((m) => CMD + (m[1] ?? m[2])),
     );
     const contributed = new Set(pkg.contributes.commands.map((c) => c.command));
     for (const id of hiddenIds) {
@@ -174,7 +173,6 @@ suite("commands/status", () => {
         ["restart", "$(debug-restart) Restart gateway"],
         ["changePort", "$(plug) Change port"],
         ["fallbackModel", "$(arrow-swap) Set fallback model"],
-        ["copyHealth", "$(copy) Copy health details"],
         ["openErrorLog", "$(file) Open error log"],
         ["showLog", "$(output) Open output log"],
         ["logLevel", "$(settings-gear) Set log level"],
@@ -366,11 +364,11 @@ suite("commands/clients", () => {
   test("describes items; model-list update only for static clients", () => {
     assert.strictEqual(
       clientItemDescription(true, "auto", "up to date"),
-      "up to date · installed · auto discovery",
+      "Configured — matches shared gateway defaults · installed · auto discovery",
     );
     assert.strictEqual(
       clientItemDescription(false, "static", "configured"),
-      "configured (outdated) · writes model list",
+      "Differs from shared gateway defaults: configuration files · writes model list",
     );
     assert.deepStrictEqual(clientActions([piAdapter]), [
       "configure",

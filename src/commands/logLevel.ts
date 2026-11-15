@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { CONFIG_SECTION, type GatewayLogLevel } from "../utils/config";
 
-const LEVELS: GatewayLogLevel[] = ["error", "warn", "info", "debug"];
+const LEVELS: GatewayLogLevel[] = ["error", "warning", "info", "debug"];
 
 export function logLevelItems(current: GatewayLogLevel) {
   return LEVELS.map((level) => ({

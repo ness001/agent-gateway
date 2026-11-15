@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 
 import { runClientConfiguration } from "./commands/clients";
 import { setFallbackModel } from "./commands/fallback";
+import { changeLogLevel } from "./commands/logLevel";
 import { changePort } from "./commands/port";
 import {
   addRemoteUpstream,
@@ -18,17 +19,25 @@ import {
   shareViaDevTunnel,
   stopDevTunnelHosting,
 } from "./commands/share";
-import { copyHealth, openErrorLog, showStatus } from "./commands/status";
+import {
+  openErrorLog,
+  showApiUrls,
+  showModels,
+  showStatus,
+  showStatusGroup,
+} from "./commands/status";
 import { setWebSearchEngine } from "./commands/webSearch";
 import { IS_DEV_VARIANT } from "./gateway/devVariant";
 import { Gateway } from "./gateway/gateway";
 import type { GatewayStatus } from "./gateway/health";
 import { CONFIG_SECTION } from "./utils/config";
 import { logger } from "./utils/logger";
+import { registerStatusView } from "./views/status";
 
 const CMD = "agentGateway";
 
 const STATUS_ICONS: Record<GatewayStatus, string> = {
+  "Running in another window": "$(windows)",
   Starting: "$(sync~spin)",
   Ready: "$(check)",
   "Waiting for Copilot": "$(watch)",
@@ -79,7 +88,8 @@ export function activate(context: vscode.ExtensionContext): Gateway {
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusBar.command = `${CMD}.showStatus`;
+  statusBar.command = `${CMD}.openSidebar`;
+  registerStatusView(context, gw);
   const render = (status: GatewayStatus) => {
     statusBar.text = `${STATUS_ICONS[status]} Gateway`;
     statusBar.tooltip = `Agent Gateway: ${status}${
@@ -105,20 +115,18 @@ export function activate(context: vscode.ExtensionContext): Gateway {
       notifiedConflicts.add(info.occupant);
       void notifyPortConflict(info.message);
     }),
-    vscode.commands.registerCommand(`${CMD}.showStatus`, () =>
-      showStatus(gw, {
-        restart: () => gw.restart(),
-        changePort: () => vscode.commands.executeCommand(`${CMD}.changePort`),
-        fallbackModel: () => setFallbackModel(gw),
-        copyHealth: () => copyHealth(gw),
-        openErrorLog: () => openErrorLog(gw),
-        setApiKey: () => setGatewayApiKey(context),
-        remotes: () => manageRemoteUpstreams(context, gw),
-        share: () => shareViaDevTunnel(context, gw),
-        webSearch: () => setWebSearchEngine(context),
-        clients: () => runClientConfiguration(context, gw),
-      }),
+    vscode.commands.registerCommand(`${CMD}.showStatus`, () => showStatus(gw)),
+    vscode.commands.registerCommand(`${CMD}.showModels`, () => showModels(gw)),
+    vscode.commands.registerCommand(`${CMD}.showApiUrls`, () =>
+      showApiUrls(gw),
     ),
+    vscode.commands.registerCommand(`${CMD}.setLogLevel`, () =>
+      changeLogLevel(),
+    ),
+    vscode.commands.registerCommand(`${CMD}.setGatewayApiKey`, () =>
+      setGatewayApiKey(context),
+    ),
+    vscode.commands.registerCommand(`${CMD}.showOutput`, () => logger.show()),
     vscode.commands.registerCommand(`${CMD}.restart`, () => gw.restart()),
     vscode.commands.registerCommand(`${CMD}.changePort`, () =>
       changePort(gw, () => runClientConfiguration(context, gw, "configure")),
@@ -143,7 +151,15 @@ export function activate(context: vscode.ExtensionContext): Gateway {
     vscode.commands.registerCommand(`${CMD}.openErrorLog`, () =>
       openErrorLog(gw),
     ),
-    vscode.commands.registerCommand(`${CMD}.copyHealth`, () => copyHealth(gw)),
+    vscode.commands.registerCommand(`${CMD}.agentSetup`, () =>
+      showStatusGroup("agentSetup"),
+    ),
+    vscode.commands.registerCommand(`${CMD}.connections`, () =>
+      showStatusGroup("connections"),
+    ),
+    vscode.commands.registerCommand(`${CMD}.diagnostics`, () =>
+      showStatusGroup("diagnostics"),
+    ),
     vscode.commands.registerCommand(`${CMD}.setApiKey`, () =>
       hiddenSetApiKey(context),
     ),

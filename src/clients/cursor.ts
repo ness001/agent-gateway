@@ -1,6 +1,8 @@
 import * as path from "path";
 
-import { ClientAdapter, ClientPlan, PLACEHOLDER_API_KEY } from "./types";
+import { gatewayV1Url } from "./defaults";
+import { manualApiKey } from "./defaults";
+import { ClientAdapter, ClientPlan } from "./types";
 
 function homeJoin(
   home: string,
@@ -48,7 +50,7 @@ export const cursorAdapter: ClientAdapter = {
     return [];
   },
   plan(input): ClientPlan {
-    const baseUrl = `${input.gatewayUrl}/v1`;
+    const baseUrl = gatewayV1Url(input);
     const loopback = isLoopback(input.gatewayUrl);
     const ids = input.models.map((m) => m.id);
     const steps: string[] = [];
@@ -58,7 +60,7 @@ export const cursorAdapter: ClientAdapter = {
       );
     }
     steps.push(
-      `Open Cursor Settings > Models and set OpenAI API Key = ${input.apiKey ? "<your gateway API key>" : PLACEHOLDER_API_KEY}.`,
+      `Open Cursor Settings > Models and set OpenAI API Key = ${manualApiKey(input)}.`,
       `Enable "Override OpenAI Base URL" and set it to ${loopback ? "<PUBLIC dev tunnel URL>/v1" : baseUrl}.`,
       "Cursor sends BYOK requests via its servers, so a 127.0.0.1 gateway URL will not work; use 'Agent Gateway: Share Gateway via Dev Tunnel' and paste that URL.",
       `Click "+ Add model" for each id: ${ids.join(", ")}.`,
