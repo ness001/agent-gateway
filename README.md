@@ -169,7 +169,7 @@ Search queries, results and page text are never logged.
 | ---------------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
 | `agentGateway.enabled`                         | `true`              | Run the gateway.                                                              |
 | `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                          |
-| `agentGateway.logLevel`                        | `info`              | `error`, `warn`, `info` or `debug`.                                           |
+| `agentGateway.logLevel`                        | `info`              | `error`, `warning`, `info` or `debug`.                                           |
 | `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).             |
 | `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).                     |
 | `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                             |

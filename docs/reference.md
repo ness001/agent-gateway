@@ -265,7 +265,7 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   `[remote][<upstream-name>]`. Settings describe forwarded metadata, not what
   the remote model applied; no prompt, stop text or cache-key value is included.
   `debug` adds provider error messages.
-- **Status** > **Set log level**: select `error`, `warn`, `info`, or `debug`.
+- **Status** > **Set log level**: select `error`, `warning`, `info`, or `debug`.
   Applies immediately without restarting; updates an existing workspace override,
   otherwise your user setting. For debug output, also select Debug for the
   Agent Gateway output channel in VS Code if its log filter hides those messages.
