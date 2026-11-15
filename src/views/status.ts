@@ -6,6 +6,7 @@ import type { GatewayStatus, HealthSnapshot } from "../gateway/health";
 export const STATUS_VIEW_ID = "agentGateway.status";
 
 const ICONS: Record<GatewayStatus, string> = {
+  "Running in another window": "windows",
   Starting: "sync~spin",
   Ready: "pass",
   "Waiting for Copilot": "watch",
@@ -55,11 +56,21 @@ export class GatewayStatusProvider
     };
     return [
       row("state", "Gateway", h.status, ICONS[h.status]),
+      ...(h.sharedStatus
+        ? [
+            row(
+              "owner",
+              "Active gateway",
+              h.sharedStatus,
+              ICONS[h.sharedStatus],
+            ),
+          ]
+        : []),
       row("listener", "Listener", h.listener.address ?? "Inactive", "plug"),
       row(
         "models",
         "Available models",
-        String(this.modelCount()),
+        String(h.sharedStatus ? h.modelCount : this.modelCount()),
         "symbol-misc",
       ),
       row(

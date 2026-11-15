@@ -24,6 +24,7 @@ import {
   type Listener,
   PortConflictError,
   type PortOccupant,
+  sharedHealth,
   start,
 } from "./listen";
 import { createLocalHandler } from "./localRoutes";
@@ -51,6 +52,7 @@ const WAIT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000, 60_000];
 export class Gateway implements vscode.Disposable {
   private status: GatewayStatus = "Starting";
   private listener: Listener | undefined;
+  private shared: HealthSnapshot | undefined;
   private localModels = new Map<string, vscode.LanguageModelChat>();
   private localInfos: ModelInfo[] = [];
   private remoteModels: { name: string; models: ModelInfo[] }[] = [];
@@ -102,7 +104,7 @@ export class Gateway implements vscode.Disposable {
   }
 
   get address(): string | undefined {
-    return this.listener?.address;
+    return this.listener?.address ?? this.shared?.listener.address ?? undefined;
   }
 
   get port(): number | undefined {
@@ -177,16 +179,37 @@ export class Gateway implements vscode.Disposable {
       if (!(error instanceof PortConflictError)) {
         throw error;
       }
-      const message = sanitizeError(error.message);
-      this.lastStartupError = message;
-      const entering =
-        this.conflict === undefined ||
-        this.conflict.occupant !== error.occupant;
-      if (entering) {
-        this.conflict = { port, occupant: error.occupant, message };
-        logger.warn(`${message} Retrying every ${this.portRetryMs / 1000} s.`);
-        this.setStatus("Port conflict");
-        this.conflictEmitter.fire(this.conflict);
+      const key =
+        error.occupant === "extension"
+          ? await this.context.secrets.get(LLM_API_KEY_SECRET_KEY)
+          : undefined;
+      const shared =
+        error.occupant === "extension"
+          ? await sharedHealth(port, key)
+          : undefined;
+      if (generation !== this.generation) {
+        return;
+      }
+      if (shared) {
+        this.shared = shared;
+        this.conflict = undefined;
+        this.lastStartupError = undefined;
+        this.setStatus("Running in another window");
+      } else {
+        this.shared = undefined;
+        const message = sanitizeError(error.message);
+        this.lastStartupError = message;
+        const entering =
+          this.conflict === undefined ||
+          this.conflict.occupant !== error.occupant;
+        if (entering) {
+          this.conflict = { port, occupant: error.occupant, message };
+          logger.warn(
+            `${message} Retrying every ${this.portRetryMs / 1000} s.`,
+          );
+          this.setStatus("Port conflict");
+          this.conflictEmitter.fire(this.conflict);
+        }
       }
       this.bindTimer = setTimeout(() => {
         this.bindTimer = undefined;
@@ -204,6 +227,7 @@ export class Gateway implements vscode.Disposable {
     }
     const recovered = this.conflict !== undefined;
     this.conflict = undefined;
+    this.shared = undefined;
     this.lastStartupError = undefined;
     logger.info(
       `Gateway ${this.bridgeVersion()} listening on ${this.listener.address}${recovered ? " (port conflict resolved)" : ""}`,
@@ -232,6 +256,7 @@ export class Gateway implements vscode.Disposable {
       this.bindTimer = undefined;
     }
     this.conflict = undefined;
+    this.shared = undefined;
     const listener = this.listener;
     this.listener = undefined;
     await listener?.close();
@@ -248,6 +273,14 @@ export class Gateway implements vscode.Disposable {
   }
 
   health(): HealthSnapshot {
+    if (this.shared) {
+      return {
+        ...this.shared,
+        status: "Running in another window",
+        sharedStatus: this.shared.status,
+        lastStartupError: null,
+      };
+    }
     const copilot = vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID);
     return {
       status: this.status,

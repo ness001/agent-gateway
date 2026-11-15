@@ -2,6 +2,7 @@ import type { ErrorRecord } from "./errorJournal";
 import type { RemoteState } from "./types";
 
 export type GatewayStatus =
+  | "Running in another window"
   | "Starting"
   | "Ready"
   | "Waiting for Copilot"
@@ -11,6 +12,8 @@ export type GatewayStatus =
 
 export interface HealthSnapshot {
   status: GatewayStatus;
+  /** Owner status when this window is observing the shared listener. */
+  sharedStatus?: GatewayStatus;
   bridgeVersion: string;
   /** Build time of the running bundle, to confirm a reinstall was loaded. */
   buildTime: string;

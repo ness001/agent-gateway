@@ -30,6 +30,7 @@ import { registerStatusView } from "./views/status";
 const CMD = "agentGateway";
 
 const STATUS_ICONS: Record<GatewayStatus, string> = {
+  "Running in another window": "$(windows)",
   Starting: "$(sync~spin)",
   Ready: "$(check)",
   "Waiting for Copilot": "$(watch)",
