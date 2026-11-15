@@ -71,7 +71,6 @@ suite("commands/palette", () => {
   const hiddenIds = [
     "setApiKey",
     "setRemoteApiKey",
-    "copyHealth",
     "openErrorLog",
     "addRemoteUpstream",
     "removeRemoteUpstream",
@@ -87,21 +86,12 @@ suite("commands/palette", () => {
     assert.deepStrictEqual(
       visible,
       [
-        "showModels=Show Models",
-        "showApiUrls=Show API URLs",
-        "setLogLevel=Set Log Level",
-        "setGatewayApiKey=Set Gateway API Key",
         "openSidebar=Open Sidebar",
-        "refreshStatus=Refresh Status",
-        "showOutput=Open Output Log",
+        "agentSetup=Agent Setup",
+        "connections=Connections",
+        "diagnostics=Diagnostics",
         "showStatus=Status",
         "restart=Restart Gateway",
-        "changePort=Change Port",
-        "setFallbackModel=Set Fallback Model",
-        "configureClients=Configure Coding Agents",
-        "setWebSearchEngine=Set Web Search Engine",
-        "shareViaDevTunnel=Share Gateway via Dev Tunnel",
-        "manageRemoteUpstreams=Manage Remote Gateways",
       ]
         .map((c) => CMD + c)
         .sort(),
@@ -183,7 +173,6 @@ suite("commands/status", () => {
         ["restart", "$(debug-restart) Restart gateway"],
         ["changePort", "$(plug) Change port"],
         ["fallbackModel", "$(arrow-swap) Set fallback model"],
-        ["copyHealth", "$(copy) Copy health details"],
         ["openErrorLog", "$(file) Open error log"],
         ["showLog", "$(output) Open output log"],
         ["logLevel", "$(settings-gear) Set log level"],

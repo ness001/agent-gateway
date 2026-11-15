@@ -20,11 +20,11 @@ import {
   stopDevTunnelHosting,
 } from "./commands/share";
 import {
-  copyHealth,
   openErrorLog,
   showApiUrls,
   showModels,
   showStatus,
+  showStatusGroup,
 } from "./commands/status";
 import { setWebSearchEngine } from "./commands/webSearch";
 import { IS_DEV_VARIANT } from "./gateway/devVariant";
@@ -151,7 +151,15 @@ export function activate(context: vscode.ExtensionContext): Gateway {
     vscode.commands.registerCommand(`${CMD}.openErrorLog`, () =>
       openErrorLog(gw),
     ),
-    vscode.commands.registerCommand(`${CMD}.copyHealth`, () => copyHealth(gw)),
+    vscode.commands.registerCommand(`${CMD}.agentSetup`, () =>
+      showStatusGroup("agentSetup"),
+    ),
+    vscode.commands.registerCommand(`${CMD}.connections`, () =>
+      showStatusGroup("connections"),
+    ),
+    vscode.commands.registerCommand(`${CMD}.diagnostics`, () =>
+      showStatusGroup("diagnostics"),
+    ),
     vscode.commands.registerCommand(`${CMD}.setApiKey`, () =>
       hiddenSetApiKey(context),
     ),

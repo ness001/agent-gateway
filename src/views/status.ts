@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 
 import { devTunnelSharingState, devTunnelSharingText } from "../commands/share";
-import { STATUS_COMMANDS, type StatusAction } from "../commands/status";
+import {
+  STATUS_COMMANDS,
+  STATUS_GROUPS,
+  type StatusAction,
+} from "../commands/status";
 import type { Gateway } from "../gateway/gateway";
 import type { GatewayStatus, HealthSnapshot } from "../gateway/health";
 import { readConfiguration } from "../utils/config";
@@ -37,7 +41,7 @@ export class GatewayStatusProvider
     return item;
   }
 
-  getChildren(): vscode.TreeItem[] {
+  getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
     const h = this.snapshot();
     const config = readConfiguration();
     const sharing = devTunnelSharingState();
@@ -60,7 +64,7 @@ export class GatewayStatusProvider
       }
       return item;
     };
-    return [
+    const rows = [
       row("state", "Gateway", h.status, ICONS[h.status]),
       ...(h.sharedStatus
         ? [
@@ -135,7 +139,6 @@ export class GatewayStatusProvider
         : []),
       row("output", "Open output log", "", "output", "showLog"),
       row("errors", "Open error log", "", "file", "openErrorLog"),
-      row("health", "Copy health details", "", "copy", "copyHealth"),
       row("restart", "Restart gateway", "", "debug-restart", "restart"),
       row(
         "copilot",
@@ -148,6 +151,44 @@ export class GatewayStatusProvider
         "copilot",
       ),
       row("version", "Extension version", h.bridgeVersion, "versions"),
+    ];
+    const byId = new Map(rows.map((item) => [item.id, item]));
+    const groupRows: Record<string, string[]> = {
+      agentSetup: ["clients", "fallback", "search"],
+      connections: ["remotes", "sharing", "apiKey", "apiUrls", "changePort"],
+      diagnostics: ["output", "errors", "logLevel"],
+    };
+    byId.set(
+      "changePort",
+      row("changePort", "Change port", "", "plug", "changePort"),
+    );
+    // Listener and model count are information, not configuration controls.
+    byId.get("listener")!.command = undefined;
+    if (element) {
+      return (groupRows[element.id ?? ""] ?? []).map((id) => byId.get(id)!);
+    }
+    const top = [
+      "state",
+      "owner",
+      "version",
+      "copilot",
+      "listener",
+      "models",
+      "error",
+      "restart",
+    ]
+      .map((id) => byId.get(id))
+      .filter((item): item is vscode.TreeItem => !!item);
+    return [
+      ...top,
+      ...STATUS_GROUPS.map((group) => {
+        const item = new vscode.TreeItem(
+          group.label,
+          vscode.TreeItemCollapsibleState.Expanded,
+        );
+        item.id = group.id;
+        return item;
+      }),
     ];
   }
 

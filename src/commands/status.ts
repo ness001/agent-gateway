@@ -17,7 +17,6 @@ export type StatusAction =
   | "changePort"
   | "fallbackModel"
   | "models"
-  | "copyHealth"
   | "openErrorLog"
   | "showLog"
   | "logLevel"
@@ -99,7 +98,6 @@ export const STATUS_COMMANDS: Record<StatusAction, string> = {
   changePort: "agentGateway.changePort",
   fallbackModel: "agentGateway.setFallbackModel",
   models: "agentGateway.showModels",
-  copyHealth: "agentGateway.copyHealth",
   openErrorLog: "agentGateway.openErrorLog",
   showLog: "agentGateway.showOutput",
   logLevel: "agentGateway.setLogLevel",
@@ -110,11 +108,51 @@ export const STATUS_COMMANDS: Record<StatusAction, string> = {
   clients: "agentGateway.configureClients",
 };
 
+export const STATUS_GROUPS = [
+  {
+    id: "agentSetup",
+    label: "Agent Setup",
+    actions: ["clients", "fallbackModel", "webSearch"],
+  },
+  {
+    id: "connections",
+    label: "Connections",
+    actions: ["remotes", "share", "setApiKey", "apiUrls", "changePort"],
+  },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    actions: ["showLog", "openErrorLog", "logLevel"],
+  },
+] as const satisfies readonly {
+  id: string;
+  label: string;
+  actions: readonly StatusAction[];
+}[];
+
+export async function showStatusGroup(
+  id: (typeof STATUS_GROUPS)[number]["id"],
+): Promise<void> {
+  const group = STATUS_GROUPS.find((g) => g.id === id)!;
+  const picked = await vscode.window.showQuickPick(
+    group.actions.map((action) => ({
+      label:
+        action === "apiUrls"
+          ? "$(link) API URLs"
+          : ACTIONS.find(([key]) => key === action)![1],
+      action,
+    })),
+    { title: `Agent Gateway: ${group.label}` },
+  );
+  if (picked) {
+    await vscode.commands.executeCommand(STATUS_COMMANDS[picked.action]);
+  }
+}
+
 const ACTIONS: [StatusAction, string, string?][] = [
   ["restart", "$(debug-restart) Restart gateway"],
   ["changePort", "$(plug) Change port"],
   ["fallbackModel", "$(arrow-swap) Set fallback model"],
-  ["copyHealth", "$(copy) Copy health details"],
   ["openErrorLog", "$(file) Open error log", "Failed requests, last 7 days"],
   ["showLog", "$(output) Open output log"],
   ["logLevel", "$(settings-gear) Set log level"],
@@ -239,11 +277,6 @@ export async function openErrorLog(gw: Gateway): Promise<void> {
   void vscode.window.showInformationMessage(
     "No gateway errors have been recorded in this window. This empty document is not a saved log file.",
   );
-}
-
-export async function copyHealth(gw: Gateway): Promise<void> {
-  await vscode.env.clipboard.writeText(JSON.stringify(gw.health(), null, 2));
-  void vscode.window.showInformationMessage("Gateway health copied.");
 }
 
 export async function showModels(gw: Gateway): Promise<void> {

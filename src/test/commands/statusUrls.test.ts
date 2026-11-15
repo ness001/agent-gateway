@@ -10,10 +10,12 @@ import {
 } from "../../commands/share";
 import {
   STATUS_COMMANDS,
+  STATUS_GROUPS,
   apiUrlItems,
   showApiUrls,
   showModels,
   showStatus,
+  showStatusGroup,
   statusItems,
 } from "../../commands/status";
 import type { Gateway } from "../../gateway/gateway";
@@ -43,6 +45,35 @@ function health(
 }
 
 suite("commands/status dispatch", () => {
+  test("group menus offer only their actions and dispatch the selected command", async () => {
+    const quickPick = vscode.window.showQuickPick;
+    const executeCommand = vscode.commands.executeCommand;
+    const calls: string[] = [];
+    try {
+      Object.assign(vscode.commands, {
+        executeCommand: async (id: string) => calls.push(id),
+      });
+      for (const group of STATUS_GROUPS) {
+        Object.assign(vscode.window, {
+          showQuickPick: async (items: { action: string }[]) => {
+            assert.deepStrictEqual(
+              items.map((item) => item.action),
+              [...group.actions],
+            );
+            return items[0];
+          },
+        });
+        await showStatusGroup(group.id);
+        assert.strictEqual(calls.at(-1), STATUS_COMMANDS[group.actions[0]]);
+      }
+      Object.assign(vscode.window, { showQuickPick: async () => undefined });
+      await showStatusGroup("agentSetup");
+      assert.strictEqual(calls.length, STATUS_GROUPS.length);
+    } finally {
+      Object.assign(vscode.window, { showQuickPick: quickPick });
+      Object.assign(vscode.commands, { executeCommand });
+    }
+  });
   test("every Status action dispatches its canonical registered command", async () => {
     const quickPick = vscode.window.showQuickPick;
     const executeCommand = vscode.commands.executeCommand;

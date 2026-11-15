@@ -271,8 +271,6 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   Agent Gateway output channel in VS Code if its log filter hides those messages.
 - **Error log** (**Status** > **Open error log**): one JSON line per failed
   request, kept for 7 days.
-- **Status** > **Copy health details**: the `/health` snapshot with recent
-  errors.
 
 Prompts, request bodies, tool arguments, search queries, URLs, page text and
 credentials are never logged.

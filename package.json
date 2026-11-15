@@ -277,11 +277,6 @@
         "category": "Agent Gateway"
       },
       {
-        "command": "agentGateway.copyHealth",
-        "title": "Copy Health Details",
-        "category": "Agent Gateway"
-      },
-      {
         "command": "agentGateway.openErrorLog",
         "title": "Open Gateway Error Log",
         "category": "Agent Gateway"
@@ -305,6 +300,21 @@
         "command": "agentGateway.setWebSearchApiKey",
         "title": "Set Web Search Engine",
         "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.agentSetup",
+        "title": "Agent Setup",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.connections",
+        "title": "Connections",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.diagnostics",
+        "title": "Diagnostics",
+        "category": "Agent Gateway"
       }
     ],
     "menus": {
@@ -317,15 +327,59 @@
       ],
       "commandPalette": [
         {
+          "command": "agentGateway.showModels",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.showApiUrls",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setLogLevel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setGatewayApiKey",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.refreshStatus",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.showOutput",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.changePort",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setFallbackModel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.configureClients",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setWebSearchEngine",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.shareViaDevTunnel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.manageRemoteUpstreams",
+          "when": "false"
+        },
+        {
           "command": "agentGateway.setApiKey",
           "when": "false"
         },
         {
           "command": "agentGateway.setRemoteApiKey",
-          "when": "false"
-        },
-        {
-          "command": "agentGateway.copyHealth",
           "when": "false"
         },
         {
