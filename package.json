@@ -176,7 +176,7 @@
         {
           "id": "agentGateway",
           "title": "Agent Gateway",
-          "icon": "images/activity-bar.svg"
+          "icon": "images/icon.png"
         }
       ]
     },
