@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.9
+
+- Add a persistent Agent Gateway sidebar with compact status, agent setup,
+  connections, and diagnostics groups in one scrolling view.
+- Share gateway status across VS Code windows and take over when the hosting
+  window closes instead of reporting a duplicate gateway as a port conflict.
+- Group Command Palette actions and open error logs directly in the editor.
+- Explain client configuration differences against shared defaults and offer
+  redacted previews before selecting or applying updates.
+- Keep shared model choices unchanged when configuration is cancelled or fails;
+  avoid false differences from formatting and restoration records.
+- Reject image downloads whose DNS addresses point to private networks,
+  including redirect destinations.
+- Use `warning` as the gateway log-level setting value.
+
 ## 0.1.8
 
 - Distinguish a missing devtunnel CLI from timeouts, launch failures, and nonzero
