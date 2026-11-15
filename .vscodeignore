@@ -3,6 +3,7 @@
 !package.json
 !README.md
 !images/icon.png
+!images/activity-bar.svg
 !images/command-palette.png
 !LICENSE
 dist/meta.json
