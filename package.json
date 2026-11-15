@@ -185,7 +185,26 @@
         {
           "id": "agentGateway.status",
           "name": "Status",
-          "contextualTitle": "Agent Gateway"
+          "contextualTitle": "Agent Gateway",
+          "visibility": "visible"
+        },
+        {
+          "id": "agentGateway.agentSetup",
+          "name": "Agent Setup",
+          "contextualTitle": "Agent Gateway",
+          "visibility": "visible"
+        },
+        {
+          "id": "agentGateway.connections",
+          "name": "Connections",
+          "contextualTitle": "Agent Gateway",
+          "visibility": "visible"
+        },
+        {
+          "id": "agentGateway.diagnostics",
+          "name": "Diagnostics",
+          "contextualTitle": "Agent Gateway",
+          "visibility": "visible"
         }
       ]
     },

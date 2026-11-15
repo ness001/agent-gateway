@@ -43,15 +43,17 @@ suite("Gateway status sidebar", () => {
         health.listener.address,
       );
       assert.equal(rows.find((i) => i.id === "models")?.description, "3");
-      assert.deepEqual(
-        rows.slice(-3).map((i) => i.id),
-        ["agentSetup", "connections", "diagnostics"],
+      assert.equal(rows.at(-1)?.id, "restart");
+      const sections = ["agentSetup", "connections", "diagnostics"].map(
+        (section) =>
+          new GatewayStatusProvider(
+            () => health,
+            () => models,
+            section,
+          ),
       );
-      assert.ok(
-        rows.findIndex((i) => i.id === "restart") <
-          rows.findIndex((i) => i.id === "agentSetup"),
-      );
-      const children = rows.flatMap((i) => provider.getChildren(i));
+      const children = sections.flatMap((section) => section.getChildren());
+      sections.forEach((section) => section.dispose());
       assert.deepEqual(
         new Set(
           [...rows, ...children].flatMap((i) =>

@@ -1,11 +1,7 @@
 import * as vscode from "vscode";
 
 import { devTunnelSharingState, devTunnelSharingText } from "../commands/share";
-import {
-  STATUS_COMMANDS,
-  STATUS_GROUPS,
-  type StatusAction,
-} from "../commands/status";
+import { STATUS_COMMANDS, type StatusAction } from "../commands/status";
 import type { Gateway } from "../gateway/gateway";
 import type { GatewayStatus, HealthSnapshot } from "../gateway/health";
 import { readConfiguration } from "../utils/config";
@@ -13,7 +9,7 @@ import { readConfiguration } from "../utils/config";
 export const STATUS_VIEW_ID = "agentGateway.status";
 
 const ICONS: Record<GatewayStatus, string> = {
-  "Running in another window": "windows",
+  "Running in another window": "window",
   Starting: "sync~spin",
   Ready: "pass",
   "Waiting for Copilot": "watch",
@@ -31,6 +27,7 @@ export class GatewayStatusProvider
   constructor(
     private readonly snapshot: () => HealthSnapshot,
     private readonly modelCount: () => number,
+    private readonly section = "status",
   ) {}
 
   refresh(): void {
@@ -42,6 +39,9 @@ export class GatewayStatusProvider
   }
 
   getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
+    if (element) {
+      return [];
+    }
     const h = this.snapshot();
     const config = readConfiguration();
     const sharing = devTunnelSharingState();
@@ -164,8 +164,8 @@ export class GatewayStatusProvider
     );
     // Listener and model count are information, not configuration controls.
     byId.get("listener")!.command = undefined;
-    if (element) {
-      return (groupRows[element.id ?? ""] ?? []).map((id) => byId.get(id)!);
+    if (this.section !== "status") {
+      return (groupRows[this.section] ?? []).map((id) => byId.get(id)!);
     }
     const top = [
       "state",
@@ -179,17 +179,7 @@ export class GatewayStatusProvider
     ]
       .map((id) => byId.get(id))
       .filter((item): item is vscode.TreeItem => !!item);
-    return [
-      ...top,
-      ...STATUS_GROUPS.map((group) => {
-        const item = new vscode.TreeItem(
-          group.label,
-          vscode.TreeItemCollapsibleState.Expanded,
-        );
-        item.id = group.id;
-        return item;
-      }),
-    ];
+    return top;
   }
 
   dispose(): void {
@@ -201,45 +191,56 @@ export function registerStatusView(
   context: vscode.ExtensionContext,
   gw: Gateway,
 ): void {
-  const provider = new GatewayStatusProvider(
-    () => gw.health(),
-    () => gw.nativeModels().length,
-  );
-  const view = vscode.window.createTreeView(STATUS_VIEW_ID, {
-    treeDataProvider: provider,
-    showCollapseAll: false,
-  });
-  // Refresh only while visible, including model discovery and health changes
-  // that do not change the gateway's overall readiness state.
-  let timer: ReturnType<typeof setInterval> | undefined;
-  const visibility = () => {
-    if (timer) {
-      clearInterval(timer);
-      timer = undefined;
-    }
-    if (view.visible) {
-      provider.refresh();
-      timer = setInterval(() => provider.refresh(), 2000);
-    }
-  };
-  context.subscriptions.push(
-    provider,
-    view,
-    gw.onDidChangeStatus(() => provider.refresh()),
-    view.onDidChangeVisibility(visibility),
-    {
-      dispose: () => {
-        if (timer) {
-          clearInterval(timer);
-        }
+  const providers: GatewayStatusProvider[] = [];
+  for (const section of [
+    "status",
+    "agentSetup",
+    "connections",
+    "diagnostics",
+  ]) {
+    const provider = new GatewayStatusProvider(
+      () => gw.health(),
+      () => gw.nativeModels().length,
+      section,
+    );
+    providers.push(provider);
+    const view = vscode.window.createTreeView(`agentGateway.${section}`, {
+      treeDataProvider: provider,
+      showCollapseAll: false,
+    });
+    // Poll only visible sections; status changes also refresh immediately.
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const visibility = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = undefined;
+      }
+      if (view.visible) {
+        provider.refresh();
+        timer = setInterval(() => provider.refresh(), 2000);
+      }
+    };
+    context.subscriptions.push(
+      provider,
+      view,
+      gw.onDidChangeStatus(() => provider.refresh()),
+      view.onDidChangeVisibility(visibility),
+      {
+        dispose: () => {
+          if (timer) {
+            clearInterval(timer);
+          }
+        },
       },
-    },
+    );
+    visibility();
+  }
+  context.subscriptions.push(
     vscode.commands.registerCommand("agentGateway.openSidebar", () =>
       vscode.commands.executeCommand(`${STATUS_VIEW_ID}.focus`),
     ),
     vscode.commands.registerCommand("agentGateway.refreshStatus", () =>
-      provider.refresh(),
+      providers.forEach((provider) => provider.refresh()),
     ),
   );
-  visibility();
 }
