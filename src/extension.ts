@@ -25,6 +25,7 @@ import { Gateway } from "./gateway/gateway";
 import type { GatewayStatus } from "./gateway/health";
 import { CONFIG_SECTION } from "./utils/config";
 import { logger } from "./utils/logger";
+import { registerStatusView } from "./views/status";
 
 const CMD = "agentGateway";
 
@@ -79,7 +80,8 @@ export function activate(context: vscode.ExtensionContext): Gateway {
     vscode.StatusBarAlignment.Right,
     100,
   );
-  statusBar.command = `${CMD}.showStatus`;
+  statusBar.command = `${CMD}.openSidebar`;
+  registerStatusView(context, gw);
   const render = (status: GatewayStatus) => {
     statusBar.text = `${STATUS_ICONS[status]} Gateway`;
     statusBar.tooltip = `Agent Gateway: ${status}${
@@ -119,6 +121,7 @@ export function activate(context: vscode.ExtensionContext): Gateway {
         clients: () => runClientConfiguration(context, gw),
       }),
     ),
+    vscode.commands.registerCommand(`${CMD}.showOutput`, () => logger.show()),
     vscode.commands.registerCommand(`${CMD}.restart`, () => gw.restart()),
     vscode.commands.registerCommand(`${CMD}.changePort`, () =>
       changePort(gw, () => runClientConfiguration(context, gw, "configure")),

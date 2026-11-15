@@ -79,7 +79,7 @@ suite("commands/palette", () => {
     "setWebSearchApiKey",
   ].map((c) => CMD + c);
 
-  test("visible palette commands are exactly the eight consolidated ones", () => {
+  test("visible palette commands retain existing actions and include the sidebar", () => {
     const visible = pkg.contributes.commands
       .filter((c) => !hidden.has(c.command))
       .map((c) => `${c.command}=${c.title}`)
@@ -87,6 +87,9 @@ suite("commands/palette", () => {
     assert.deepStrictEqual(
       visible,
       [
+        "openSidebar=Open Sidebar",
+        "refreshStatus=Refresh Status",
+        "showOutput=Open Output Log",
         "showStatus=Status",
         "restart=Restart Gateway",
         "changePort=Change Port",
@@ -109,9 +112,11 @@ suite("commands/palette", () => {
       .map((f) => fs.readFileSync(path.join(ROOT, "src", f), "utf8"))
       .join("\n");
     const registered = new Set(
-      [...source.matchAll(/registerCommand\(\s*`\$\{CMD\}\.(\w+)`/g)].map(
-        (m) => CMD + m[1],
-      ),
+      [
+        ...source.matchAll(
+          /registerCommand\(\s*(?:`\$\{CMD\}\.(\w+)`|"agentGateway\.(\w+)")/g,
+        ),
+      ].map((m) => CMD + (m[1] ?? m[2])),
     );
     const contributed = new Set(pkg.contributes.commands.map((c) => c.command));
     for (const id of hiddenIds) {

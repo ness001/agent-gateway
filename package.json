@@ -171,7 +171,41 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentGateway",
+          "title": "Agent Gateway",
+          "icon": "images/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentGateway": [
+        {
+          "id": "agentGateway.status",
+          "name": "Status",
+          "contextualTitle": "Agent Gateway"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "agentGateway.openSidebar",
+        "title": "Open Sidebar",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.refreshStatus",
+        "title": "Refresh Status",
+        "category": "Agent Gateway",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "agentGateway.showOutput",
+        "title": "Open Output Log",
+        "category": "Agent Gateway"
+      },
       {
         "command": "agentGateway.showStatus",
         "title": "Status",
@@ -254,6 +288,13 @@
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "agentGateway.refreshStatus",
+          "when": "view == agentGateway.status",
+          "group": "navigation"
+        }
+      ],
       "commandPalette": [
         {
           "command": "agentGateway.setApiKey",

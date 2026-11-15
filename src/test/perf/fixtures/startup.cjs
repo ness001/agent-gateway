@@ -69,6 +69,11 @@ const real = {
       dispose() {},
     }),
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
+    createTreeView: () => ({
+      visible: false,
+      onDidChangeVisibility: disposable,
+      dispose() {},
+    }),
   },
   commands: { registerCommand: disposable, executeCommand: async () => {} },
   workspace: {
