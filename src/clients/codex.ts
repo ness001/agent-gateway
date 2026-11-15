@@ -3,13 +3,14 @@
 import * as path from "path";
 
 import { selectedContextWindow } from "./contextWindow";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey, gatewayV1Url } from "./defaults";
 import {
   ClientAdapter,
   ClientConfigInput,
   ClientPlan,
   GATEWAY_PROVIDER_ID,
   GATEWAY_PROVIDER_NAME,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 const MARKER_PREFIX = "# agent-gateway previous:";
@@ -22,7 +23,8 @@ const PROVIDER_CATALOG_KEY = "provider.model_catalog_url";
 const FEATURE_MARKER = "# agent-gateway previous feature:";
 const DISCOVERY_FEATURE = "api_key_model_discovery";
 const PROXY_FEATURE = "respect_system_proxy";
-const FEATURES_HEADER_RE = /^\s*\[\s*(?:features|"features"|'features')\s*\]\s*(#.*)?$/;
+const FEATURES_HEADER_RE =
+  /^\s*\[\s*(?:features|"features"|'features')\s*\]\s*(#.*)?$/;
 const TOP_KEYS = ["model_provider", "model"] as const;
 
 function codexConfigPath(home: string, platform: NodeJS.Platform): string {
@@ -237,9 +239,10 @@ function readMarker(p: Parsed): Record<string, string> | undefined {
               .slice(PROVIDER_CATALOG_MARKER.length)
               .trim();
           } else if (trimmed.startsWith(FEATURE_MARKER)) {
-            const feature = /^(api_key_model_discovery|respect_system_proxy)=(.*)$/.exec(
-              trimmed.slice(FEATURE_MARKER.length).trim(),
-            );
+            const feature =
+              /^(api_key_model_discovery|respect_system_proxy)=(.*)$/.exec(
+                trimmed.slice(FEATURE_MARKER.length).trim(),
+              );
             if (feature) {
               result[`features.${feature[1]}`] = feature[2];
             }
@@ -271,7 +274,7 @@ function buildTable(
   input: ClientConfigInput,
   marker: Record<string, string>,
 ): string[] {
-  const key = input.apiKey || PLACEHOLDER_API_KEY;
+  const key = gatewayApiKey(input);
   return [
     `[model_providers.${GATEWAY_PROVIDER_ID}]`,
     `${MARKER_PREFIX} model_provider=${marker.model_provider}, model=${marker.model}`,
@@ -283,9 +286,9 @@ function buildTable(
       .filter((key) => `features.${key}` in marker)
       .map((key) => `${FEATURE_MARKER} ${key}=${marker[`features.${key}`]}`),
     `name = ${tomlString(GATEWAY_PROVIDER_NAME)}`,
-    `base_url = ${tomlString(`${input.gatewayUrl.replace(/\/+$/, "")}/v1`)}`,
-    `${CATALOG_KEY} = ${tomlString(`${input.gatewayUrl.replace(/\/+$/, "")}/v1/models`)}`,
-    `wire_api = "responses"`,
+    `base_url = ${tomlString(gatewayV1Url(input))}`,
+    `${CATALOG_KEY} = ${tomlString(`${gatewayV1Url(input)}/models`)}`,
+    `wire_api = "${CLIENT_DEFAULTS.codex.wireApi}"`,
     `experimental_bearer_token = ${tomlString(key)}`,
   ];
 }
@@ -337,7 +340,8 @@ function planCodex(
   }
   if (!(PROVIDER_CATALOG_KEY in marker)) {
     const catalogLine = p.table
-      ? p.lines.slice(p.table.start + 1, p.table.end)
+      ? p.lines
+          .slice(p.table.start + 1, p.table.end)
           .map((line) => topKeyRe(CATALOG_KEY).exec(line))
           .find((match) => match !== null)
       : undefined;
@@ -347,7 +351,9 @@ function planCodex(
   }
   const features = [
     DISCOVERY_FEATURE,
-    ...(input.platform === "darwin" ? [PROXY_FEATURE] : []),
+    ...(input.platform === CLIENT_DEFAULTS.codex.proxyPlatform
+      ? [PROXY_FEATURE]
+      : []),
   ];
   for (const key of features) {
     if (!(`features.${key}` in marker)) {
@@ -432,7 +438,7 @@ function planCodex(
 
   let after = join(lines, p.eol);
   for (const key of features) {
-    after = setFeature(after, key, "true");
+    after = setFeature(after, key, String(CLIENT_DEFAULTS.codex.discovery));
   }
   return {
     changes: before === after ? [] : [{ path: file, before, after }],
@@ -460,7 +466,11 @@ function unplanCodex(
   let lines = p.lines.slice();
   if (p.table) {
     lines = removeTable(lines, p.table);
-    if (marker && marker[PROVIDER_CATALOG_KEY] !== undefined && marker[PROVIDER_CATALOG_KEY] !== UNSET) {
+    if (
+      marker &&
+      marker[PROVIDER_CATALOG_KEY] !== undefined &&
+      marker[PROVIDER_CATALOG_KEY] !== UNSET
+    ) {
       lines.splice(
         Math.min(p.table.start, lines.length),
         0,
@@ -574,7 +584,7 @@ export function planCodexWebSearch(
   const summary: string[] = [];
 
   if (enable) {
-    if (found && unquote(found.raw) === "live") {
+    if (found && unquote(found.raw) === CLIENT_DEFAULTS.codex.webSearch) {
       return {
         changes: [],
         summary: ['Codex web_search is already "live"'],
@@ -582,9 +592,9 @@ export function planCodexWebSearch(
     }
     const previous = markerIndex >= 0 ? undefined : (found?.raw ?? UNSET);
     if (found) {
-      lines[found.index] = `web_search = "live"`;
+      lines[found.index] = `web_search = "${CLIENT_DEFAULTS.codex.webSearch}"`;
     } else {
-      lines.splice(0, 0, `web_search = "live"`);
+      lines.splice(0, 0, `web_search = "${CLIENT_DEFAULTS.codex.webSearch}"`);
     }
     if (previous !== undefined) {
       const at = found ? found.index : 0;

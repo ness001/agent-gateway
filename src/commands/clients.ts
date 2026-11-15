@@ -162,11 +162,59 @@ async function pickClients(
       };
     }),
   );
-  const picked = await vscode.window.showQuickPick(items, {
-    canPickMany: true,
-    title: `${verb}: select coding agents`,
+  const picker = vscode.window.createQuickPick<(typeof items)[number]>();
+  picker.canSelectMany = true;
+  picker.ignoreFocusOut = true;
+  picker.title = `${verb}: select coding agents`;
+  picker.placeholder = `Shared target: ${input.defaultModel}. Use the diff button to preview without applying.`;
+  picker.items = items.map((item) => ({
+    ...item,
+    buttons: [
+      {
+        iconPath: new vscode.ThemeIcon("diff"),
+        tooltip: "Preview differences",
+      },
+    ],
+  }));
+  picker.selectedItems = picker.items.filter((item) => item.picked);
+  return new Promise((resolve) => {
+    const subscriptions = [
+      picker.onDidAccept(() => {
+        const selected = picker.selectedItems.map((item) => item.adapter);
+        resolve(selected.length ? selected : undefined);
+        picker.hide();
+      }),
+      picker.onDidHide(() => {
+        resolve(undefined);
+        subscriptions.forEach((subscription) => subscription.dispose());
+        picker.dispose();
+      }),
+      picker.onDidTriggerItemButton(async ({ item }) => {
+        try {
+          const files = await loadFiles(
+            item.adapter.configPaths(home, process.platform),
+          );
+          const plan = item.adapter.plan(input, files);
+          if (plan.blocked) {
+            void vscode.window.showWarningMessage(plan.blocked);
+          } else if (
+            !plan.changes.some((change) => change.before !== change.after)
+          ) {
+            void vscode.window.showInformationMessage(
+              `${item.label} matches shared gateway defaults (model: ${input.defaultModel}).`,
+            );
+          } else {
+            await showDiffs([[item.adapter, plan]], [input.apiKey]);
+          }
+        } catch (error) {
+          void vscode.window.showErrorMessage(
+            `Cannot preview ${item.label}: ${error instanceof Error ? error.message : "configuration could not be read"}`,
+          );
+        }
+      }),
+    ];
+    picker.show();
   });
-  return picked?.length ? picked.map((p) => p.adapter) : undefined;
 }
 
 async function pickDefaultModel(

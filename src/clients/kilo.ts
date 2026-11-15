@@ -8,6 +8,9 @@ import {
 import * as path from "path";
 
 import { validContextWindow } from "./contextWindow";
+import { agentModels } from "./defaults";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey, gatewayV1Url } from "./defaults";
 import {
   type ClientAdapter,
   type ClientConfigInput,
@@ -15,7 +18,6 @@ import {
   GATEWAY_PROVIDER_ID,
   GATEWAY_PROVIDER_NAME,
   type GatewayModel,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 // Kilo CLI (an OpenCode fork) reads ~/.config/kilo/kilo.json[c] on every
@@ -83,14 +85,7 @@ function kiloTarget(
 
 function kiloModels(models: GatewayModel[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const m of models) {
-    if (
-      m.supportsToolCalling === false ||
-      m.id.startsWith("copilot-utility") ||
-      m.id.startsWith("copilot-dictation")
-    ) {
-      continue;
-    }
+  for (const m of agentModels(models)) {
     const entry: Record<string, unknown> = {
       name: m.displayName || m.id,
       tool_call: true,
@@ -197,18 +192,10 @@ export const kiloAdapter: ClientAdapter = {
             ) + "\n"
           : backupBefore;
     const key = ["provider", GATEWAY_PROVIDER_ID];
-    text = edit(text, [...key, "npm"], "@ai-sdk/openai-compatible");
+    text = edit(text, [...key, "npm"], CLIENT_DEFAULTS.kilo.npm);
     text = edit(text, [...key, "name"], GATEWAY_PROVIDER_NAME);
-    text = edit(
-      text,
-      [...key, "options", "baseURL"],
-      `${input.gatewayUrl.replace(/\/+$/, "")}/v1`,
-    );
-    text = edit(
-      text,
-      [...key, "options", "apiKey"],
-      input.apiKey || PLACEHOLDER_API_KEY,
-    );
+    text = edit(text, [...key, "options", "baseURL"], gatewayV1Url(input));
+    text = edit(text, [...key, "options", "apiKey"], gatewayApiKey(input));
     text = edit(text, [...key, "models"], models);
     text = edit(
       text,

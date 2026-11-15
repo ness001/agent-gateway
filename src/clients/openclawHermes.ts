@@ -9,13 +9,16 @@ import * as path from "path";
 import { Scalar, isMap, parseDocument } from "yaml";
 
 import { validContextWindow } from "./contextWindow";
+import { gatewayV1Url } from "./defaults";
+import { toolModels } from "./defaults";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey } from "./defaults";
 import {
   ClientAdapter,
   ClientConfigInput,
   ClientPlan,
   GATEWAY_PROVIDER_ID,
   GatewayModel,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 function pathFor(platform: NodeJS.Platform) {
@@ -23,12 +26,12 @@ function pathFor(platform: NodeJS.Platform) {
 }
 
 function keyOf(input: ClientConfigInput): string {
-  return input.apiKey || PLACEHOLDER_API_KEY;
+  return gatewayApiKey(input);
 }
 
 /** Models usable by an agent: tool calling not explicitly unsupported. */
 function agentModels(models: GatewayModel[]): GatewayModel[] {
-  return models.filter((m) => m.supportsToolCalling !== false);
+  return toolModels(models);
 }
 
 function change(
@@ -195,7 +198,7 @@ export const openclawAdapter: ClientAdapter = {
     const root = parsed.value;
     const summary: string[] = [];
     if (root.models?.mode === undefined) {
-      text = set(text, ["models", "mode"], "merge");
+      text = set(text, ["models", "mode"], CLIENT_DEFAULTS.openclaw.mode);
     }
     const models = agentModels(input.models).map((m) => {
       const entry: Record<string, unknown> = {
@@ -218,7 +221,7 @@ export const openclawAdapter: ClientAdapter = {
     text = set(text, ["models", "providers", GATEWAY_PROVIDER_ID], {
       baseUrl: input.gatewayUrl,
       apiKey: keyOf(input),
-      api: "anthropic-messages",
+      api: CLIENT_DEFAULTS.openclaw.api,
       models,
     });
     summary.push(
@@ -406,11 +409,11 @@ export const hermesAdapter: ClientAdapter = {
       };
     }
     const entry = {
-      api: `${input.gatewayUrl}/v1`,
+      api: gatewayV1Url(input),
       api_key: keyOf(input),
-      transport: "chat_completions",
+      transport: CLIENT_DEFAULTS.hermes.transport,
       default_model: input.defaultModel,
-      discover_models: true,
+      discover_models: CLIENT_DEFAULTS.hermes.discoverModels,
       models: Object.fromEntries(
         agentModels(input.models).flatMap((m) => {
           const context = validContextWindow(m.contextWindow);

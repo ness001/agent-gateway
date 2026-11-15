@@ -9,13 +9,15 @@ import * as path from "path";
 import { isMap, parseDocument } from "yaml";
 
 import { validContextWindow } from "./contextWindow";
+import { agentModels } from "./defaults";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey, gatewayV1Url } from "./defaults";
 import {
   type ClientAdapter,
   type ClientConfigInput,
   type ClientPlan,
   GATEWAY_PROVIDER_ID,
   type GatewayModel,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 function pathApi(platform: NodeJS.Platform): path.PlatformPath {
@@ -23,11 +25,11 @@ function pathApi(platform: NodeJS.Platform): path.PlatformPath {
 }
 
 function baseUrl(input: ClientConfigInput): string {
-  return `${input.gatewayUrl.replace(/\/+$/, "")}/v1`;
+  return gatewayV1Url(input);
 }
 
 function apiKey(input: ClientConfigInput): string {
-  return input.apiKey || PLACEHOLDER_API_KEY;
+  return gatewayApiKey(input);
 }
 
 function change(
@@ -141,8 +143,8 @@ export const ompAdapter: ClientAdapter = {
     const entry = {
       baseUrl: baseUrl(input),
       apiKey: apiKey(input),
-      api: "openai-responses",
-      discovery: { type: "openai-models-list", injectV1: false },
+      api: CLIENT_DEFAULTS.omp.api,
+      discovery: CLIENT_DEFAULTS.omp.discovery,
     };
     const keys = ["providers", GATEWAY_PROVIDER_ID];
     if (!isMap(doc.getIn(keys, true))) {
@@ -156,7 +158,10 @@ export const ompAdapter: ClientAdapter = {
         doc.setIn([...keys, "discovery"], doc.createNode(entry.discovery));
       } else {
         doc.setIn([...keys, "discovery", "type"], entry.discovery.type);
-        doc.setIn([...keys, "discovery", "injectV1"], false);
+        doc.setIn(
+          [...keys, "discovery", "injectV1"],
+          CLIENT_DEFAULTS.omp.discovery.injectV1,
+        );
       }
     }
     const after = doc.toString();
@@ -420,29 +425,22 @@ function piPrevious(text: string | undefined): PiPrevious | undefined {
 const FORMAT: FormattingOptions = { insertSpaces: true, tabSize: 2, eol: "\n" };
 
 function piModels(models: GatewayModel[]): Record<string, unknown>[] {
-  return models
-    .filter(
-      (m) =>
-        m.supportsToolCalling !== false &&
-        !m.id.startsWith("copilot-utility") &&
-        !m.id.startsWith("copilot-dictation"),
-    )
-    .map((m) => {
-      const entry: Record<string, unknown> = {
-        id: m.id,
-        name: m.displayName || m.id,
-        reasoning: m.reasoning,
-        input: m.inputModalities.filter((x) => x === "text" || x === "image"),
-      };
-      const contextWindow = validContextWindow(m.contextWindow);
-      if (contextWindow !== undefined) {
-        entry.contextWindow = contextWindow;
-      }
-      if (m.maxOutputTokens !== undefined) {
-        entry.maxTokens = m.maxOutputTokens;
-      }
-      return entry;
-    });
+  return agentModels(models).map((m) => {
+    const entry: Record<string, unknown> = {
+      id: m.id,
+      name: m.displayName || m.id,
+      reasoning: m.reasoning,
+      input: m.inputModalities.filter((x) => x === "text" || x === "image"),
+    };
+    const contextWindow = validContextWindow(m.contextWindow);
+    if (contextWindow !== undefined) {
+      entry.contextWindow = contextWindow;
+    }
+    if (m.maxOutputTokens !== undefined) {
+      entry.maxTokens = m.maxOutputTokens;
+    }
+    return entry;
+  });
 }
 
 function parseJsonc(text: string, filePath: string): unknown {
@@ -494,7 +492,7 @@ export const piAdapter: ClientAdapter = {
     const models = piModels(input.models);
     const key = ["providers", GATEWAY_PROVIDER_ID];
     text = edit(text, [...key, "baseUrl"], baseUrl(input));
-    text = edit(text, [...key, "api"], "openai-responses");
+    text = edit(text, [...key, "api"], CLIENT_DEFAULTS.pi.api);
     text = edit(text, [...key, "apiKey"], apiKey(input));
     text = edit(text, [...key, "models"], models);
     if (!models.some((m) => m.id === input.defaultModel)) {

@@ -63,11 +63,116 @@ suite("shared client defaults", () => {
     );
   });
 
+  test("preview button opens redacted diffs without selecting a model or saving state", async () => {
+    const adapters = ALL_CLIENT_ADAPTERS as ClientAdapter[];
+    const originalAdapters = [...adapters];
+    const createQuickPick = vscode.window.createQuickPick;
+    const quickPick = vscode.window.showQuickPick;
+    const open = vscode.workspace.openTextDocument;
+    const execute = vscode.commands.executeCommand;
+    const documents: string[] = [];
+    const commands: string[] = [];
+    const writes: unknown[] = [];
+    const accept = new vscode.EventEmitter<void>();
+    const hide = new vscode.EventEmitter<void>();
+    const button = new vscode.EventEmitter<unknown>();
+    adapters.splice(0, adapters.length, {
+      id: "preview",
+      label: "Preview client",
+      discovery: "auto",
+      detectPaths: () => [],
+      configPaths: () => [],
+      plan: () => ({
+        changes: [
+          {
+            path: "preview.json",
+            before: '{"api_key":"old-secret","model":"old"}',
+            after: '{"api_key":"new-secret","model":"claude-model"}',
+          },
+        ],
+        summary: [],
+      }),
+      unplan: () => ({ changes: [], summary: [] }),
+    });
+    Object.assign(vscode.window, {
+      createQuickPick: () => ({
+        items: [],
+        selectedItems: [],
+        onDidAccept: accept.event,
+        onDidHide: hide.event,
+        onDidTriggerItemButton: button.event,
+        show() {
+          button.fire({ item: this.items[0] });
+        },
+        hide() {
+          hide.fire();
+        },
+        dispose() {},
+      }),
+      showQuickPick: async () => {
+        throw new Error("Preview must not open model picker");
+      },
+    });
+    Object.assign(vscode.workspace, {
+      openTextDocument: async ({ content }: { content: string }) => {
+        documents.push(content);
+        return {
+          uri: vscode.Uri.parse(`untitled:preview-${documents.length}`),
+        };
+      },
+    });
+    Object.assign(vscode.commands, {
+      executeCommand: async (id: string) => {
+        commands.push(id);
+        hide.fire();
+      },
+    });
+    try {
+      await runClientConfiguration(
+        {
+          secrets: { get: async () => undefined },
+          globalState: {
+            get: () => "claude-model",
+            update: async (...args: unknown[]) => {
+              writes.push(args);
+            },
+          },
+        } as unknown as vscode.ExtensionContext,
+        {
+          port: 24444,
+          nativeModels: () =>
+            models.map((model) => ({ ...model, supportedReasoningLevels: [] })),
+        } as unknown as Gateway,
+        "configure",
+      );
+      assert.deepEqual(commands, ["vscode.diff"]);
+      assert.equal(documents.length, 2);
+      assert.ok(
+        documents.every(
+          (text) => text.includes("<redacted>") && !text.includes("secret"),
+        ),
+      );
+      assert.deepEqual(writes, []);
+    } finally {
+      adapters.splice(0, adapters.length, ...originalAdapters);
+      Object.assign(vscode.window, {
+        createQuickPick,
+        showQuickPick: quickPick,
+      });
+      Object.assign(vscode.workspace, { openTextDocument: open });
+      Object.assign(vscode.commands, { executeCommand: execute });
+      accept.dispose();
+      hide.dispose();
+      button.dispose();
+    }
+  });
+
   for (const outcome of ["cancel", "failure", "success"] as const) {
     test(`shared choice is saved only after successful configuration: ${outcome}`, async () => {
       const adapters = ALL_CLIENT_ADAPTERS as ClientAdapter[];
       const originalAdapters = [...adapters];
       const quickPick = vscode.window.showQuickPick;
+      const createQuickPick = vscode.window.createQuickPick;
       const info = vscode.window.showInformationMessage;
       const error = vscode.window.showErrorMessage;
       const open = vscode.workspace.openTextDocument;
@@ -97,8 +202,34 @@ suite("shared client defaults", () => {
       };
       adapters.splice(0, adapters.length, adapter);
       Object.assign(vscode.window, {
-        showQuickPick: async (items: unknown[]) =>
-          ++picker === 1 ? [items[0]] : { label: "z-model" },
+        createQuickPick: () => {
+          const accept = new vscode.EventEmitter<void>();
+          const hide = new vscode.EventEmitter<void>();
+          const button = new vscode.EventEmitter<unknown>();
+          return {
+            items: [],
+            selectedItems: [],
+            onDidAccept: accept.event,
+            onDidHide: hide.event,
+            onDidTriggerItemButton: button.event,
+            show() {
+              this.selectedItems = [this.items[0]];
+              accept.fire();
+            },
+            hide() {
+              hide.fire();
+            },
+            dispose() {
+              accept.dispose();
+              hide.dispose();
+              button.dispose();
+            },
+          };
+        },
+        showQuickPick: async () => {
+          picker++;
+          return { label: "z-model" };
+        },
         showInformationMessage: async (
           _message: string,
           options: unknown,
@@ -138,6 +269,7 @@ suite("shared client defaults", () => {
         adapters.splice(0, adapters.length, ...originalAdapters);
         Object.assign(vscode.window, {
           showQuickPick: quickPick,
+          createQuickPick,
           showInformationMessage: info,
           showErrorMessage: error,
         });

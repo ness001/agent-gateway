@@ -70,8 +70,8 @@ export interface ClientAdapter {
   ): ClientPlan;
 }
 
-/** Provider/entry name written into every client config. */
-export const GATEWAY_PROVIDER_ID = "agent-gateway";
-export const GATEWAY_PROVIDER_NAME = "Agent Gateway";
-/** Written when the gateway has no API key; the gateway strips caller credentials. */
-export const PLACEHOLDER_API_KEY = "local-gateway-client";
+export {
+  GATEWAY_PROVIDER_ID,
+  GATEWAY_PROVIDER_NAME,
+  PLACEHOLDER_API_KEY,
+} from "./defaults";

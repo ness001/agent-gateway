@@ -3,13 +3,9 @@ import * as path from "path";
 
 import { ALIAS_PREFIX } from "../gateway/catalog";
 import { selectedContextWindow } from "./contextWindow";
+import { gatewayApiKey } from "./defaults";
 import { CLIENT_DEFAULTS } from "./defaults";
-import {
-  ClientAdapter,
-  ClientConfigInput,
-  ClientPlan,
-  PLACEHOLDER_API_KEY,
-} from "./types";
+import { ClientAdapter, ClientConfigInput, ClientPlan } from "./types";
 
 const MANAGED_KEYS = [
   "ANTHROPIC_BASE_URL",
@@ -75,7 +71,7 @@ function setValue(text: string, keyPath: string[], value: unknown): string {
 function desiredValues(input: ClientConfigInput): Record<string, string> {
   return {
     ANTHROPIC_BASE_URL: input.gatewayUrl,
-    ANTHROPIC_AUTH_TOKEN: input.apiKey || PLACEHOLDER_API_KEY,
+    ANTHROPIC_AUTH_TOKEN: gatewayApiKey(input),
     CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY:
       CLIENT_DEFAULTS.claudeModelDiscovery,
     // Use the catalog's Claude-compatible alias only for this client.

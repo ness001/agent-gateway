@@ -1,7 +1,8 @@
 import { ParseError, applyEdits, modify, parse } from "jsonc-parser";
 import * as path from "path";
 
-import { ClientAdapter, ClientConfigInput, PLACEHOLDER_API_KEY } from "./types";
+import { manualApiKey } from "./defaults";
+import { ClientAdapter, ClientConfigInput } from "./types";
 
 // Antigravity CLI (agy) talks to a custom endpoint only in its Gemini API key
 // mode: `"modelProvider": "gemini"` in ~/.gemini/antigravity-cli/settings.json
@@ -52,7 +53,7 @@ function setProvider(text: string | undefined, value: unknown): string {
 }
 
 function envSteps(input: ClientConfigInput): string[] {
-  const key = input.apiKey ? "<your gateway API key>" : PLACEHOLDER_API_KEY;
+  const key = manualApiKey(input);
   return input.platform === "win32"
     ? [
         `setx GOOGLE_GEMINI_BASE_URL ${input.gatewayUrl}`,

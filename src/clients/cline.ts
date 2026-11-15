@@ -1,10 +1,10 @@
 import * as path from "path";
 
+import { gatewayApiKey, gatewayV1Url } from "./defaults";
 import {
   type ClientAdapter,
   type ClientConfigInput,
   type ClientPlan,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 // Cline CLI (v3) keeps provider settings in ~/.cline/data/settings/providers.json,
@@ -47,7 +47,7 @@ function providersPath(home: string, platform: NodeJS.Platform): string {
 }
 
 function baseUrl(input: ClientConfigInput): string {
-  return `${input.gatewayUrl.replace(/\/+$/, "")}/v1`;
+  return gatewayV1Url(input);
 }
 
 function change(
@@ -129,7 +129,7 @@ export const clineAdapter: ClientAdapter = {
     const file = read(before, target);
     const settings = {
       provider: PROVIDER,
-      apiKey: input.apiKey || PLACEHOLDER_API_KEY,
+      apiKey: gatewayApiKey(input),
       model: input.defaultModel,
       baseUrl: baseUrl(input),
     };
