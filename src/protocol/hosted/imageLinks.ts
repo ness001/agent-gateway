@@ -7,6 +7,7 @@ import type {
   Part,
   TextPart,
 } from "../core/types";
+import { UnsafeImageAddressError, fetchImage } from "./imageFetch";
 import { checkUrl } from "./urlSafety";
 
 /** Per-image download timeout (same as URL fetch). */
@@ -74,7 +75,7 @@ export async function downloadImage(
     maxBytes?: number;
   },
 ): Promise<ImagePart> {
-  const doFetch = o.fetch ?? ((u, init) => fetch(u, init));
+  const doFetch = o.fetch ?? fetchImage;
   const timeout = new AbortController();
   const timer = setTimeout(
     () => timeout.abort(),
@@ -96,7 +97,10 @@ export async function downloadImage(
           headers: { "user-agent": "agent-gateway", accept: "image/*" },
           signal,
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof UnsafeImageAddressError) {
+          throw new LinkError("unsafe");
+        }
         throw new LinkError(timeout.signal.aborted ? "timeout" : "network");
       }
       if (res.status >= 300 && res.status < 400) {
