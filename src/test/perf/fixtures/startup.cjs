@@ -69,11 +69,7 @@ const real = {
       dispose() {},
     }),
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
-    createTreeView: () => ({
-      visible: false,
-      onDidChangeVisibility: disposable,
-      dispose() {},
-    }),
+    registerWebviewViewProvider: disposable,
   },
   commands: { registerCommand: disposable, executeCommand: async () => {} },
   workspace: {

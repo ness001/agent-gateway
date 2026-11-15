@@ -5,6 +5,7 @@ import { STATUS_COMMANDS, type StatusAction } from "../commands/status";
 import type { Gateway } from "../gateway/gateway";
 import type { GatewayStatus, HealthSnapshot } from "../gateway/health";
 import { readConfiguration } from "../utils/config";
+import { type SidebarSection, statusHtml } from "./statusHtml";
 
 export const STATUS_VIEW_ID = "agentGateway.status";
 
@@ -191,56 +192,92 @@ export function registerStatusView(
   context: vscode.ExtensionContext,
   gw: Gateway,
 ): void {
-  const providers: GatewayStatusProvider[] = [];
-  for (const section of [
-    "status",
-    "agentSetup",
-    "connections",
-    "diagnostics",
-  ]) {
-    const provider = new GatewayStatusProvider(
-      () => gw.health(),
-      () => gw.nativeModels().length,
-      section,
-    );
-    providers.push(provider);
-    const view = vscode.window.createTreeView(`agentGateway.${section}`, {
-      treeDataProvider: provider,
-      showCollapseAll: false,
-    });
-    // Poll only visible sections; status changes also refresh immediately.
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const visibility = () => {
-      if (timer) {
-        clearInterval(timer);
-        timer = undefined;
-      }
-      if (view.visible) {
-        provider.refresh();
-        timer = setInterval(() => provider.refresh(), 2000);
-      }
-    };
-    context.subscriptions.push(
-      provider,
-      view,
-      gw.onDidChangeStatus(() => provider.refresh()),
-      view.onDidChangeVisibility(visibility),
-      {
-        dispose: () => {
-          if (timer) {
-            clearInterval(timer);
-          }
-        },
-      },
-    );
-    visibility();
-  }
+  let currentView: vscode.WebviewView | undefined;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const sections = [
+    ["status", "Status"],
+    ["agentSetup", "Agent Setup"],
+    ["connections", "Connections"],
+    ["diagnostics", "Diagnostics"],
+  ];
+  const providers = sections.map(
+    ([id]) =>
+      new GatewayStatusProvider(
+        () => gw.health(),
+        () => gw.nativeModels().length,
+        id,
+      ),
+  );
+  const refresh = () => {
+    if (!currentView?.visible) {
+      return;
+    }
+    const data: SidebarSection[] = sections.map(([id, label], index) => ({
+      id,
+      label,
+      rows: providers[index].getChildren().map((row) => ({
+        id: row.id!,
+        label: String(row.label),
+        value: String(row.description ?? ""),
+        action: row.command?.command,
+      })),
+    }));
+    void currentView.webview.postMessage({ type: "sections", sections: data });
+  };
+  const visibility = () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = undefined;
+    }
+    if (currentView?.visible) {
+      refresh();
+      timer = setInterval(refresh, 2000);
+    }
+  };
   context.subscriptions.push(
+    ...providers,
+    vscode.window.registerWebviewViewProvider(STATUS_VIEW_ID, {
+      resolveWebviewView(view) {
+        currentView = view;
+        view.webview.options = { enableScripts: true, localResourceRoots: [] };
+        view.webview.html = statusHtml();
+        context.subscriptions.push(
+          view.webview.onDidReceiveMessage((message: unknown) => {
+            if (!message || typeof message !== "object") {
+              return;
+            }
+            const data = message as { type?: unknown; action?: unknown };
+            if (data.type === "ready") {
+              refresh();
+            }
+            if (
+              data.type === "action" &&
+              typeof data.action === "string" &&
+              Object.values(STATUS_COMMANDS).includes(data.action)
+            ) {
+              void vscode.commands.executeCommand(data.action);
+            }
+          }),
+          view.onDidChangeVisibility(visibility),
+          view.onDidDispose(() => {
+            currentView = undefined;
+            visibility();
+          }),
+        );
+        visibility();
+      },
+    }),
+    gw.onDidChangeStatus(refresh),
+    {
+      dispose: () => {
+        if (timer) {
+          clearInterval(timer);
+        }
+      },
+    },
     vscode.commands.registerCommand("agentGateway.openSidebar", () =>
       vscode.commands.executeCommand(`${STATUS_VIEW_ID}.focus`),
     ),
-    vscode.commands.registerCommand("agentGateway.refreshStatus", () =>
-      providers.forEach((provider) => provider.refresh()),
-    ),
+    vscode.commands.registerCommand("agentGateway.refreshStatus", refresh),
   );
 }
