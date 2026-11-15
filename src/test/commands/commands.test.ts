@@ -87,6 +87,10 @@ suite("commands/palette", () => {
     assert.deepStrictEqual(
       visible,
       [
+        "showModels=Show Models",
+        "showApiUrls=Show API URLs",
+        "setLogLevel=Set Log Level",
+        "setGatewayApiKey=Set Gateway API Key",
         "openSidebar=Open Sidebar",
         "refreshStatus=Refresh Status",
         "showOutput=Open Output Log",

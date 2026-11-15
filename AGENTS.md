@@ -6,6 +6,15 @@ For release, publish, or version-tag requests, read
 Preserve unrelated changes and active user sessions; use an isolated worktree
 when another task is editing the same checkout.
 
+## Status and command consistency
+
+Keep sidebar status rows, the Status menu, and Command Palette actions aligned.
+An actionable status row must invoke the same registered command and handler as
+its matching menu action; do not duplicate configuration workflows in the view.
+When adding or changing an action, check all three entry points and preserve
+legacy command IDs. Put operational status and settings first, actions next,
+and informational Copilot Chat and extension version rows last.
+
 ## Completion requires local installation
 
 After each completed change to this repository, build and install the updated

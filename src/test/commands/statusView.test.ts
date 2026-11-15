@@ -1,5 +1,6 @@
 import * as assert from "node:assert/strict";
 
+import { STATUS_COMMANDS } from "../../commands/status";
 import type { HealthSnapshot } from "../../gateway/health";
 import { GatewayStatusProvider } from "../../views/status";
 
@@ -42,6 +43,30 @@ suite("Gateway status sidebar", () => {
         health.listener.address,
       );
       assert.equal(rows.find((i) => i.id === "models")?.description, "3");
+      assert.deepEqual(
+        rows.slice(-2).map((i) => i.id),
+        ["copilot", "version"],
+      );
+      assert.deepEqual(
+        new Set(rows.flatMap((i) => (i.command ? [i.command.command] : []))),
+        new Set(Object.values(STATUS_COMMANDS)),
+      );
+      assert.equal(
+        rows.find((i) => i.id === "listener")?.command?.command,
+        STATUS_COMMANDS.changePort,
+      );
+      assert.equal(
+        rows.find((i) => i.id === "models")?.command?.command,
+        STATUS_COMMANDS.models,
+      );
+      assert.equal(
+        rows.find((i) => i.id === "remotes")?.command?.command,
+        STATUS_COMMANDS.remotes,
+      );
+      assert.equal(
+        rows.find((i) => i.id === "fallback")?.command?.command,
+        STATUS_COMMANDS.fallbackModel,
+      );
       assert.equal(
         rows.find((i) => i.id === "restart")?.command?.command,
         "agentGateway.restart",

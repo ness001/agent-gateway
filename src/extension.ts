@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 
 import { runClientConfiguration } from "./commands/clients";
 import { setFallbackModel } from "./commands/fallback";
+import { changeLogLevel } from "./commands/logLevel";
 import { changePort } from "./commands/port";
 import {
   addRemoteUpstream,
@@ -18,7 +19,13 @@ import {
   shareViaDevTunnel,
   stopDevTunnelHosting,
 } from "./commands/share";
-import { copyHealth, openErrorLog, showStatus } from "./commands/status";
+import {
+  copyHealth,
+  openErrorLog,
+  showApiUrls,
+  showModels,
+  showStatus,
+} from "./commands/status";
 import { setWebSearchEngine } from "./commands/webSearch";
 import { IS_DEV_VARIANT } from "./gateway/devVariant";
 import { Gateway } from "./gateway/gateway";
@@ -108,19 +115,16 @@ export function activate(context: vscode.ExtensionContext): Gateway {
       notifiedConflicts.add(info.occupant);
       void notifyPortConflict(info.message);
     }),
-    vscode.commands.registerCommand(`${CMD}.showStatus`, () =>
-      showStatus(gw, {
-        restart: () => gw.restart(),
-        changePort: () => vscode.commands.executeCommand(`${CMD}.changePort`),
-        fallbackModel: () => setFallbackModel(gw),
-        copyHealth: () => copyHealth(gw),
-        openErrorLog: () => openErrorLog(gw),
-        setApiKey: () => setGatewayApiKey(context),
-        remotes: () => manageRemoteUpstreams(context, gw),
-        share: () => shareViaDevTunnel(context, gw),
-        webSearch: () => setWebSearchEngine(context),
-        clients: () => runClientConfiguration(context, gw),
-      }),
+    vscode.commands.registerCommand(`${CMD}.showStatus`, () => showStatus(gw)),
+    vscode.commands.registerCommand(`${CMD}.showModels`, () => showModels(gw)),
+    vscode.commands.registerCommand(`${CMD}.showApiUrls`, () =>
+      showApiUrls(gw),
+    ),
+    vscode.commands.registerCommand(`${CMD}.setLogLevel`, () =>
+      changeLogLevel(),
+    ),
+    vscode.commands.registerCommand(`${CMD}.setGatewayApiKey`, () =>
+      setGatewayApiKey(context),
     ),
     vscode.commands.registerCommand(`${CMD}.showOutput`, () => logger.show()),
     vscode.commands.registerCommand(`${CMD}.restart`, () => gw.restart()),

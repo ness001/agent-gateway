@@ -191,6 +191,26 @@
     },
     "commands": [
       {
+        "command": "agentGateway.showModels",
+        "title": "Show Models",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.showApiUrls",
+        "title": "Show API URLs",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setLogLevel",
+        "title": "Set Log Level",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setGatewayApiKey",
+        "title": "Set Gateway API Key",
+        "category": "Agent Gateway"
+      },
+      {
         "command": "agentGateway.openSidebar",
         "title": "Open Sidebar",
         "category": "Agent Gateway"
