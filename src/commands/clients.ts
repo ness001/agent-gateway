@@ -3,9 +3,11 @@ import * as os from "node:os";
 import * as vscode from "vscode";
 
 import { applyPlan, loadFiles, redactSecrets } from "../clients/apply";
+import { CLIENT_DEFAULTS, sharedDefaultModel } from "../clients/defaults";
 import {
   describeDifferences,
   redactConfigCredentials,
+  settingDifferences,
 } from "../clients/differences";
 import { ALL_CLIENT_ADAPTERS, DISCOVERY_LABELS } from "../clients/index";
 import type {
@@ -19,7 +21,7 @@ import type { CatalogEntry } from "../gateway/types";
 import { LLM_API_KEY_SECRET_KEY } from "../utils/constant";
 import { logger } from "../utils/logger";
 
-const LAST_MODEL_KEY = "agentGateway.configureClients.defaultModel";
+const LAST_MODEL_KEY = CLIENT_DEFAULTS.modelStateKey;
 
 export function toGatewayModel(e: CatalogEntry): GatewayModel {
   return {
@@ -36,34 +38,34 @@ export type ClientConfigState =
   | "up to date"
   | "configured"
   | "not configured"
-  | "manual verification needed";
+  | "manual verification needed"
+  | "invalid configuration";
 
-/**
- * Whether the gateway is set up in a client's config files. plan() producing no
- * file change means the config already matches (up to date); otherwise
- * unplan() producing a change means our entries are present (configured, but
- * stale: different port, key or model list). Both are pure, so this only
- * costs reading the config files once.
- */
+/** Compare managed values with the shared target; restore records and formatting are ignored. */
 export function clientConfigState(
   adapter: ClientAdapter,
   input: ClientConfigInput,
   files: Record<string, string | undefined>,
 ): ClientConfigState {
-  const changes = (p: ClientPlan) =>
-    p.changes.filter((c) => c.before !== c.after).length;
-  if (
-    adapter.discovery !== "manual" &&
-    changes(adapter.plan(input, files)) === 0
-  ) {
-    return "up to date";
-  }
   if (adapter.discovery === "manual") {
     return "manual verification needed";
   }
-  return changes(adapter.unplan(input, files)) > 0
-    ? "configured"
-    : "not configured";
+  try {
+    const plan = adapter.plan(input, files);
+    if (plan.blocked) {
+      return "invalid configuration";
+    }
+    if (settingDifferences(plan).length === 0) {
+      return "up to date";
+    }
+    return adapter
+      .unplan(input, files)
+      .changes.some((c) => c.before !== c.after)
+      ? "configured"
+      : "not configured";
+  } catch {
+    return "invalid configuration";
+  }
 }
 
 export function clientItemDescription(
@@ -74,14 +76,16 @@ export function clientItemDescription(
 ): string {
   const status =
     state === "up to date"
-      ? "Configured — matches current settings"
+      ? "Configured — matches shared gateway defaults"
       : state === "configured"
-        ? `Configured — differences: ${differences.length ? differences.join(", ") : "configuration files"}`
-        : state === "manual verification needed"
-          ? "Manual verification needed"
-          : state === "not configured"
-            ? "Not configured"
-            : "Configuration could not be read";
+        ? `Differs from shared gateway defaults: ${differences.length ? differences.join(", ") : "configuration files"}`
+        : state === "invalid configuration"
+          ? "Invalid configuration — repair required"
+          : state === "manual verification needed"
+            ? "Manual verification needed"
+            : state === "not configured"
+              ? "Not configured"
+              : "Configuration could not be read";
   return [status, installed ? "installed" : "", DISCOVERY_LABELS[discovery]]
     .filter(Boolean)
     .join(" · ");
@@ -147,7 +151,7 @@ async function pickClients(
         ),
         detail: [
           paths.length
-            ? `Differs from current settings: ${paths.join(", ")}. Review differences before applying; existing choices may be intentional.`
+            ? `Differs from shared gateway defaults: ${paths.join(", ")}. Review differences before applying; existing choices may be intentional.`
             : "",
           a.caveat,
         ]
@@ -171,19 +175,13 @@ async function pickDefaultModel(
 ): Promise<string | undefined> {
   const sorted = [...models].sort((a, b) => a.id.localeCompare(b.id));
   const previous = context.globalState.get<string>(LAST_MODEL_KEY);
-  const preferred =
-    sorted.find((m) => m.id === previous) ??
-    sorted.find((m) => m.id.startsWith("claude-")) ??
-    sorted[0];
+  const preferred = sharedDefaultModel(models, previous)!;
   const items = [preferred, ...sorted.filter((m) => m !== preferred)].map(
     (m) => ({ label: m.id, description: m.displayName }),
   );
   const picked = await vscode.window.showQuickPick(items, {
-    title: "Default model for the selected agents",
+    title: "Shared default model for coding agents (saved after applying)",
   });
-  if (picked) {
-    await context.globalState.update(LAST_MODEL_KEY, picked.label);
-  }
   return picked?.label;
 }
 
@@ -237,8 +235,7 @@ export async function runClientConfiguration(
     gatewayUrl: `http://127.0.0.1:${port}`,
     apiKey: (await context.secrets.get(LLM_API_KEY_SECRET_KEY)) || undefined,
     models,
-    defaultModel:
-      models.find((m) => m.id === previous)?.id ?? models[0]?.id ?? "",
+    defaultModel: sharedDefaultModel(models, previous)?.id ?? "",
     home,
     platform: process.platform,
   };
@@ -287,10 +284,12 @@ export async function runClientConfiguration(
   for (const a of adapters) {
     try {
       const files = await loadFiles(a.configPaths(home, process.platform));
-      plans.push([
-        a,
-        mode === "configure" ? a.plan(input, files) : a.unplan(input, files),
-      ]);
+      const plan =
+        mode === "configure" ? a.plan(input, files) : a.unplan(input, files);
+      if (plan.blocked) {
+        throw new Error(plan.blocked);
+      }
+      plans.push([a, plan]);
     } catch (err) {
       failures.push(`${a.label}: ${(err as Error).message}`);
     }
@@ -350,6 +349,15 @@ export async function runClientConfiguration(
       );
       return;
     }
+  }
+
+  if (
+    mode === "configure" &&
+    failures.length === 0 &&
+    plans.length > 0 &&
+    plans.every(([adapter]) => adapter.discovery !== "manual")
+  ) {
+    await context.globalState.update(LAST_MODEL_KEY, input.defaultModel);
   }
 
   const clipboard = plans

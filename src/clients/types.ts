@@ -34,6 +34,8 @@ export interface PlannedFileChange {
 }
 
 export interface ClientPlan {
+  /** Explicit refusal: an empty change list must not be interpreted as a match. */
+  blocked?: string;
   changes: PlannedFileChange[];
   /** One-line human summaries shown before applying. */
   summary: string[];

@@ -184,7 +184,7 @@
       "agentGateway": [
         {
           "id": "agentGateway.status",
-          "name": "Gateway",
+          "name": "Agent Gateway",
           "type": "webview",
           "contextualTitle": "Agent Gateway"
         }

@@ -3,6 +3,7 @@ import * as path from "path";
 
 import { ALIAS_PREFIX } from "../gateway/catalog";
 import { selectedContextWindow } from "./contextWindow";
+import { CLIENT_DEFAULTS } from "./defaults";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -22,7 +23,7 @@ const MANAGED_KEYS = [
 const PREVIOUS_KEY = "AGENT_GATEWAY_PREVIOUS";
 const CONTEXT_KEY = "CLAUDE_CODE_MAX_CONTEXT_TOKENS";
 const OUTPUT_KEY = "CLAUDE_CODE_MAX_OUTPUT_TOKENS";
-const DEFAULT_OUTPUT_TOKENS = "128000";
+const DEFAULT_OUTPUT_TOKENS = CLIENT_DEFAULTS.claudeOutputTokens;
 
 function pathApi(platform: NodeJS.Platform): path.PlatformPath {
   return platform === "win32" ? path.win32 : path.posix;
@@ -75,12 +76,13 @@ function desiredValues(input: ClientConfigInput): Record<string, string> {
   return {
     ANTHROPIC_BASE_URL: input.gatewayUrl,
     ANTHROPIC_AUTH_TOKEN: input.apiKey || PLACEHOLDER_API_KEY,
-    CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
+    CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY:
+      CLIENT_DEFAULTS.claudeModelDiscovery,
     // Use the catalog's Claude-compatible alias only for this client.
     ANTHROPIC_MODEL: input.defaultModel.startsWith(ALIAS_PREFIX)
       ? input.defaultModel
       : ALIAS_PREFIX + input.defaultModel,
-    CLAUDE_CODE_AUTO_MODE_SERVER: "0",
+    CLAUDE_CODE_AUTO_MODE_SERVER: CLIENT_DEFAULTS.claudeAutoModeServer,
   };
 }
 

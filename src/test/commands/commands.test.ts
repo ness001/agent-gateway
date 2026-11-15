@@ -364,11 +364,11 @@ suite("commands/clients", () => {
   test("describes items; model-list update only for static clients", () => {
     assert.strictEqual(
       clientItemDescription(true, "auto", "up to date"),
-      "Configured — matches current settings · installed · auto discovery",
+      "Configured — matches shared gateway defaults · installed · auto discovery",
     );
     assert.strictEqual(
       clientItemDescription(false, "static", "configured"),
-      "Configured — differences: configuration files · writes model list",
+      "Differs from shared gateway defaults: configuration files · writes model list",
     );
     assert.deepStrictEqual(clientActions([piAdapter]), [
       "configure",

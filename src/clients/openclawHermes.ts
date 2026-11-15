@@ -159,6 +159,7 @@ function stripMarker(text: string): string {
 
 function refuseOpenclaw(p: string, error: string): ClientPlan {
   return {
+    blocked: "OpenClaw configuration needs manual repair.",
     changes: [],
     summary: [
       `Cannot safely edit ${p}: it is not parseable as JSON with comments (${error}).`,

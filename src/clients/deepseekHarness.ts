@@ -134,6 +134,7 @@ export const deepseekHarnessAdapter: ClientAdapter = {
     const { doc, seq, error } = load(before);
     if (!seq) {
       return {
+        blocked: "DeepSeek Harness configuration needs manual repair.",
         changes: [],
         summary: [`Cannot safely edit ${p}: ${error}.`],
         manualSteps: [
@@ -192,6 +193,7 @@ export const deepseekHarnessAdapter: ClientAdapter = {
     const { doc, seq } = load(before);
     if (!seq) {
       return {
+        blocked: "DeepSeek Harness configuration needs manual repair.",
         changes: [],
         summary: [`Cannot parse ${p}; nothing removed.`],
       };

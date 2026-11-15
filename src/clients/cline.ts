@@ -17,6 +17,8 @@ interface ProviderEntry {
   settings: Record<string, unknown>;
   updatedAt: string;
   tokenSource?: string;
+  /** Marks only entries this adapter wrote; never infer ownership from a loopback URL. */
+  agentGateway?: { baseUrl: string };
 }
 
 interface ProvidersFile {
@@ -88,7 +90,25 @@ function isGatewayEntry(
   entry: ProviderEntry | undefined,
   input: ClientConfigInput,
 ): boolean {
-  return entry?.settings?.baseUrl === baseUrl(input);
+  if (entry?.settings?.baseUrl === baseUrl(input)) {
+    return true;
+  }
+  if (
+    !entry?.agentGateway?.baseUrl ||
+    entry.agentGateway.baseUrl !== entry.settings?.baseUrl
+  ) {
+    return false;
+  }
+  try {
+    const url = new URL(entry.agentGateway.baseUrl);
+    return (
+      url.protocol === "http:" &&
+      url.hostname === "127.0.0.1" &&
+      url.pathname === "/v1"
+    );
+  } catch {
+    return false;
+  }
 }
 
 export const clineAdapter: ClientAdapter = {
@@ -116,12 +136,21 @@ export const clineAdapter: ClientAdapter = {
     const current = file.providers[PROVIDER];
     const same =
       current !== undefined &&
-      JSON.stringify(current.settings) === JSON.stringify(settings);
+      Object.entries(settings).every(
+        ([key, value]) => current.settings[key] === value,
+      );
+    if (same && file.lastUsedProvider === PROVIDER) {
+      return {
+        changes: [],
+        summary: ["Cline matches the shared gateway defaults."],
+      };
+    }
     if (!same) {
       file.providers[PROVIDER] = {
         settings,
         updatedAt: new Date().toISOString(),
         tokenSource: "manual",
+        agentGateway: { baseUrl: baseUrl(input) },
       };
     }
     file.lastUsedProvider = PROVIDER;
