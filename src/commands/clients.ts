@@ -3,6 +3,10 @@ import * as os from "node:os";
 import * as vscode from "vscode";
 
 import { applyPlan, loadFiles, redactSecrets } from "../clients/apply";
+import {
+  describeDifferences,
+  redactConfigCredentials,
+} from "../clients/differences";
 import { ALL_CLIENT_ADAPTERS, DISCOVERY_LABELS } from "../clients/index";
 import type {
   ClientAdapter,
@@ -28,7 +32,11 @@ export function toGatewayModel(e: CatalogEntry): GatewayModel {
   };
 }
 
-export type ClientConfigState = "up to date" | "configured" | "not configured";
+export type ClientConfigState =
+  | "up to date"
+  | "configured"
+  | "not configured"
+  | "manual verification needed";
 
 /**
  * Whether the gateway is set up in a client's config files. plan() producing no
@@ -50,6 +58,9 @@ export function clientConfigState(
   ) {
     return "up to date";
   }
+  if (adapter.discovery === "manual") {
+    return "manual verification needed";
+  }
   return changes(adapter.unplan(input, files)) > 0
     ? "configured"
     : "not configured";
@@ -59,12 +70,19 @@ export function clientItemDescription(
   installed: boolean,
   discovery: ClientAdapter["discovery"],
   state: ClientConfigState | undefined,
+  differences: string[] = [],
 ): string {
-  return [
-    state ? (state === "configured" ? "configured (outdated)" : state) : "",
-    installed ? "installed" : "",
-    DISCOVERY_LABELS[discovery],
-  ]
+  const status =
+    state === "up to date"
+      ? "Configured — matches current settings"
+      : state === "configured"
+        ? `Configured — differences: ${differences.length ? differences.join(", ") : "configuration files"}`
+        : state === "manual verification needed"
+          ? "Manual verification needed"
+          : state === "not configured"
+            ? "Not configured"
+            : "Configuration could not be read";
+  return [status, installed ? "installed" : "", DISCOVERY_LABELS[discovery]]
     .filter(Boolean)
     .join(" · ");
 }
@@ -104,16 +122,37 @@ async function pickClients(
         .detectPaths(home, process.platform)
         .some((p) => existsSync(p));
       let state: ClientConfigState | undefined;
+      let differences: string[] = [];
+      let paths: string[] = [];
       try {
         const files = await loadFiles(a.configPaths(home, process.platform));
         state = clientConfigState(a, input, files);
+        if (state === "configured") {
+          const plan = a.plan(input, files);
+          differences = describeDifferences(plan);
+          paths = plan.changes
+            .filter((c) => c.before !== c.after)
+            .map((c) => c.path);
+        }
       } catch {
         state = undefined;
       }
       return {
         label: a.label,
-        description: clientItemDescription(installed, a.discovery, state),
-        detail: a.caveat,
+        description: clientItemDescription(
+          installed,
+          a.discovery,
+          state,
+          differences,
+        ),
+        detail: [
+          paths.length
+            ? `Differs from current settings: ${paths.join(", ")}. Review differences before applying; existing choices may be intentional.`
+            : "",
+          a.caveat,
+        ]
+          .filter(Boolean)
+          .join(" "),
         picked: pickedByDefault(state),
         adapter: a,
       };
@@ -158,10 +197,12 @@ async function showDiffs(
         continue;
       }
       const left = await vscode.workspace.openTextDocument({
-        content: redactSecrets(c.before ?? "", secrets),
+        content: redactConfigCredentials(
+          redactSecrets(c.before ?? "", secrets),
+        ),
       });
       const right = await vscode.workspace.openTextDocument({
-        content: redactSecrets(c.after ?? "", secrets),
+        content: redactConfigCredentials(redactSecrets(c.after ?? "", secrets)),
       });
       await vscode.commands.executeCommand(
         "vscode.diff",
@@ -261,7 +302,13 @@ export async function runClientConfiguration(
   const preview = [
     ...plans
       .filter(([, p]) => p.changes.some((c) => c.before !== c.after))
-      .map(([a]) => `- ${a.label}`),
+      .map(
+        ([a, plan]) =>
+          `- ${a.label}: ${describeDifferences(plan).join(", ")}\n${plan.changes
+            .filter((c) => c.before !== c.after)
+            .map((c) => `  ${c.path}`)
+            .join("\n")}`,
+      ),
     ...failures.map((f) => `Skipped ${f}`),
   ].join("\n");
 
@@ -272,9 +319,9 @@ export async function runClientConfiguration(
       verb,
       { modal: true, detail: preview },
       apply,
-      "Show diff",
+      "Review differences",
     );
-    if (choice === "Show diff") {
+    if (choice === "Review differences") {
       await showDiffs(plans, [input.apiKey]);
       // A picker that stays open while the diff editors are scrolled
       // (a modal blocks them; a notification hides itself).
