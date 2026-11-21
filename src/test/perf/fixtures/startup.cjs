@@ -70,6 +70,9 @@ const real = {
     }),
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
     registerWebviewViewProvider: disposable,
+    showWarningMessage: async () => undefined,
+    showInformationMessage: async () => undefined,
+    showErrorMessage: async () => undefined,
   },
   commands: { registerCommand: disposable, executeCommand: async () => {} },
   workspace: {
