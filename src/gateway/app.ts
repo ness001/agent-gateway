@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { cors } from "hono/cors";
 
 import {
   logRequestSettings,
@@ -269,6 +270,8 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
   const app = new Hono();
   let tunnelWarningShown = false;
 
+  app.use("*", cors());
+
   app.use("*", async (c, next) => {
     const id = requestIdFrom(c.req.raw.headers);
     const started = Date.now();
@@ -359,11 +362,27 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       }
       if (path === "/v1/models") {
         const reg = deps.getRegistry();
-        return c.json(
-          c.req.query("client_version")
-            ? createCodexModelsResponse(reg)
-            : createModelsResponse(reg),
-        );
+        if (c.req.query("client_version")) {
+          return c.json(createCodexModelsResponse(reg));
+        }
+        // Advertise explicit mappings with the target's real metadata. Clients
+        // that validate configured IDs against discovery need these routes too.
+        const advertised = [...reg];
+        for (const [id, target] of Object.entries(
+          safeRead(deps.getModelAliases) ?? {},
+        )) {
+          if (reg.some((entry) => entry.id === id)) {
+            continue;
+          }
+          const entry = resolveModelAlias(reg, id, {
+            userAliases: { [id]: target },
+            operation: "anthropic.messages",
+          });
+          if (entry) {
+            advertised.push({ ...entry, id, isAlias: true });
+          }
+        }
+        return c.json(createModelsResponse(advertised));
       }
       if (path === "/health") {
         return c.json(deps.getHealth() as object);

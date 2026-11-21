@@ -92,6 +92,69 @@ suite("Gateway app", () => {
     assert.ok(Array.isArray(codex.models));
   });
 
+  test("advertises explicit aliases with real metadata and routes streams and tools to the original model", async () => {
+    const h = harness();
+    const target = h.deps.getRegistry().find((e) => e.id === "gpt-6-astra")!;
+    target.displayName = "GPT 6 Astra";
+    h.deps.getModelAliases = () => ({
+      "gateway-claude-astra": "gpt-6-astra",
+      disabled: "",
+      missing: "not-available",
+      remote: "box--gpt-5-remote",
+      "gpt-5": "gpt-6-astra",
+    });
+    const app = createGatewayApp(h.deps);
+    const listed = await (await app.fetch(get("/v1/models"))).json();
+    const alias = listed.data.find(
+      (e: { id: string }) => e.id === "gateway-claude-astra",
+    );
+    assert.strictEqual(alias.display_name, "GPT 6 Astra");
+    assert.strictEqual(alias.owned_by, "copilot");
+    assert.strictEqual(alias.context_window, target.contextWindow);
+    assert.ok(
+      !listed.data.some((e: { id: string }) =>
+        ["disabled", "missing", "remote"].includes(e.id),
+      ),
+    );
+    assert.strictEqual(
+      listed.data.filter((e: { id: string }) => e.id === "gpt-5").length,
+      1,
+    );
+    const codex = await (
+      await app.fetch(get("/v1/models?client_version=0.1"))
+    ).json();
+    assert.ok(
+      !codex.models.some(
+        (e: { id: string }) => e.id === "gateway-claude-astra",
+      ),
+    );
+    const body = {
+      model: "gateway-claude-astra",
+      stream: true,
+      messages: [{ role: "user", content: "Use the synthetic test tool." }],
+      tools: [
+        { name: "test_tool", input_schema: { type: "object", properties: {} } },
+      ],
+    };
+    const response = await app.fetch(post("/v1/messages", body));
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(
+      response.headers.get("x-agent-gateway-model"),
+      "gpt-6-astra",
+    );
+    assert.strictEqual(
+      response.headers.get("x-agent-gateway-model-fallback"),
+      "gateway-claude-astra -> gpt-6-astra; reason=model alias",
+    );
+    assert.deepStrictEqual(await h.local[0].json(), {
+      ...body,
+      model: "gpt-6-astra",
+    });
+    assert.strictEqual(h.remote.length, 0);
+    assert.strictEqual(target.id, "gpt-6-astra");
+    assert.strictEqual(target.isAlias, false);
+  });
+
   test("catalog lists local models only", async () => {
     const app = createGatewayApp(harness().deps);
     const body = await (await app.fetch(get("/v1/gateway/catalog"))).json();
