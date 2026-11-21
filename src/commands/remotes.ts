@@ -230,7 +230,8 @@ export async function addRemoteUpstream(
   const existing = configuredRemoteNames(current);
   const rawUrl = await vscode.window.showInputBox({
     title: "Add Remote Gateway (1/3)",
-    prompt: "Remote gateway URL, e.g. a dev tunnel URL",
+    prompt:
+      "Remote gateway or OpenAI-compatible server origin, e.g. a dev tunnel URL or http://127.0.0.1:4143",
     ignoreFocusOut: true,
     validateInput: (v) => {
       const r = validateRemoteUrl(v);
@@ -267,7 +268,7 @@ export async function addRemoteUpstream(
   }
   const apiKey = await vscode.window.showInputBox({
     title: "Add Remote Gateway (3/3)",
-    prompt: "API key of the remote gateway (leave empty if none)",
+    prompt: "API key of the remote (leave empty if none)",
     password: true,
     ignoreFocusOut: true,
   });

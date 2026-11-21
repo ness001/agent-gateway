@@ -118,9 +118,9 @@ suite("discoverRemote", () => {
     }
   });
 
-  for (const [status, text] of [
-    [404, "tunnel missing or not an Agent Gateway"],
-    [401, "API key"],
+  for (const [status, text, expectedCalls] of [
+    [404, "not an Agent Gateway or OpenAI-compatible server", 2],
+    [401, "API key", 1],
   ] as const) {
     test(`HTTP ${status} skipped without retry or body leak`, async () => {
       let calls = 0;
@@ -136,7 +136,7 @@ suite("discoverRemote", () => {
         assert.ok(reason.includes(`HTTP ${status}`));
         assert.ok(reason.includes(text), reason);
         assert.ok(!reason.includes("SECRET"));
-        assert.strictEqual(calls, 1);
+        assert.strictEqual(calls, expectedCalls);
       } finally {
         await s.close();
       }
@@ -197,7 +197,82 @@ suite("discoverRemote", () => {
         r.state.status === "skipped" ? r.state.reason : "",
         /invalid JSON/,
       );
-      assert.strictEqual(calls, 1);
+      assert.strictEqual(calls, 2);
+    } finally {
+      await s.close();
+    }
+  });
+
+  test("falls back to an OpenAI-compatible /v1/models list", async () => {
+    const paths: string[] = [];
+    const auths: (string | undefined)[] = [];
+    const s = await startServer((req, res) => {
+      paths.push(req.url ?? "");
+      auths.push(req.headers.authorization);
+      if (req.url !== "/v1/models") {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      res.end(
+        JSON.stringify({
+          object: "list",
+          data: [
+            {
+              id: "quick",
+              object: "model",
+              owned_by: "microsoft",
+              context_window: 1000000,
+            },
+            { id: "plain", object: "model" },
+            { id: "quick", object: "model" },
+            { object: "model" },
+          ],
+        }),
+      );
+    });
+    try {
+      const r = await discoverRemote(
+        { name: "a", url: s.url },
+        { ...fast, apiKey: "k1" },
+      );
+      assert.strictEqual(r.state.status, "ready");
+      assert.deepStrictEqual(paths, ["/v1/gateway/catalog", "/v1/models"]);
+      assert.deepStrictEqual(auths, ["Bearer k1", "Bearer k1"]);
+      assert.deepStrictEqual(
+        r.models.map((m) => [
+          m.id,
+          m.contextWindow,
+          m.vendor,
+          m.nativeOperations,
+        ]),
+        [
+          ["quick", 1000000, "microsoft", ["openai.chatCompletions"]],
+          ["plain", null, undefined, ["openai.chatCompletions"]],
+        ],
+      );
+      // Every API is advertised; the gateway translates the others.
+      assert.strictEqual(r.models[0].operations.length, 7);
+    } finally {
+      await s.close();
+    }
+  });
+
+  test("a model list without data is skipped", async () => {
+    const s = await startServer((req, res) => {
+      if (req.url !== "/v1/models") {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      res.end(JSON.stringify({ models: [] }));
+    });
+    try {
+      const r = await discoverRemote({ name: "a", url: s.url }, fast);
+      assert.match(
+        r.state.status === "skipped" ? r.state.reason : "",
+        /GET \/v1\/models returned an unexpected document/,
+      );
     } finally {
       await s.close();
     }

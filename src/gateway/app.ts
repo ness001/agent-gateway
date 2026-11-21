@@ -61,6 +61,11 @@ export interface GatewayAppDeps {
    * to the upstream ID. Production wires this to the borrowed bridge routes.
    */
   handleLocal: (request: Request) => Promise<Response>;
+  /**
+   * Handles a request for a remote model in an API the remote does not serve
+   * (see `ModelInfo.nativeOperations`); the model is the advertised gateway ID.
+   */
+  handleTranslated?: (request: Request) => Promise<Response>;
   getRemote: (name: string) => RemoteUpstreamConfig | undefined;
   getRemoteApiKey: (name: string) => Promise<string | undefined>;
   getApiKey: () => Promise<string | undefined>;
@@ -668,6 +673,24 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
           `Remote upstream '${entry.remote}' is not configured.`,
         );
       }
+      if (
+        entry.nativeOperations &&
+        !entry.nativeOperations.includes(operation)
+      ) {
+        if (context) {
+          context.remote = remote.name;
+        }
+        if (!deps.handleTranslated) {
+          return errorResponse(
+            protocol,
+            400,
+            "The upstream does not advertise this inference API.",
+          );
+        }
+        return deps.handleTranslated(
+          await coreRequest(c, entry.id, gemini, body),
+        );
+      }
       let geminiBody: Record<string, unknown> | undefined;
       if (gemini) {
         try {
@@ -753,11 +776,25 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       }
     }
 
+    return deps.handleLocal(
+      await coreRequest(c, entry.upstreamModelId, gemini, body),
+    );
+  }
+
+  /** Rebuilds the request for the protocol core with the model rewritten to `modelId`. */
+  async function coreRequest(
+    c: Context,
+    modelId: string,
+    gemini: { action: string } | undefined,
+    body?: Record<string, unknown>,
+  ): Promise<Request> {
+    const raw = c.req.raw;
+    const url = new URL(raw.url);
     let target: string;
     let payload: () => string;
     let parsed: { value: unknown } | undefined;
     if (gemini) {
-      target = `${url.origin}/v1beta/models/${encodeURIComponent(entry.upstreamModelId)}:${gemini.action}${url.search}`;
+      target = `${url.origin}/v1beta/models/${encodeURIComponent(modelId)}:${gemini.action}${url.search}`;
       const text = await c.req.text();
       payload = () => text;
       try {
@@ -767,7 +804,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       }
     } else {
       target = `${url.origin}${url.pathname}${url.search}`;
-      const forwarded = { ...body, model: entry.upstreamModelId };
+      const forwarded = { ...body, model: modelId };
       payload = () => JSON.stringify(forwarded);
       parsed = { value: forwarded };
     }
@@ -786,7 +823,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
     if (parsed) {
       attachParsedBody(request, parsed.value);
     }
-    return deps.handleLocal(request);
+    return request;
   }
 
   app.onError((error, c) => {

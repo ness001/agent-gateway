@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add OpenAI-compatible servers as remote upstreams: when `/v1/gateway/catalog`
+  is missing, models are discovered from the standard `GET /v1/models` list.
+  Anthropic Messages, OpenAI Responses and Gemini requests to those models are
+  translated to Chat Completions, so every supported agent can use them.
+
 ## 0.20.0
 
 - Scope Claude Code setup guidance to the CLI; Claude Desktop needs separate configuration.

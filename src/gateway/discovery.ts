@@ -374,3 +374,38 @@ export function validateModelInfo(value: unknown): ModelInfo {
   }
   return info;
 }
+
+const OPENAI_CONTEXT_KEYS = [
+  "context_window",
+  "context_length",
+  "max_context_length",
+  "max_input_tokens",
+];
+
+/**
+ * Normalises one entry of a standard OpenAI `GET /v1/models` list. Such
+ * servers are assumed to serve only Chat Completions; the gateway translates
+ * every other API to it.
+ */
+export function fromOpenAIModel(value: unknown): ModelInfo {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    value.id.trim() === ""
+  ) {
+    throw new InvalidModelMetadataError("Model list entry has an invalid id.");
+  }
+  // Third-party lists use several names for capacity; ignore unusable values.
+  const contextWindow = OPENAI_CONTEXT_KEYS.map((k) => value[k]).find(
+    (v): v is number =>
+      typeof v === "number" && Number.isSafeInteger(v) && v > 0,
+  );
+  const info = toModelInfo({
+    id: value.id,
+    name: typeof value.name === "string" ? value.name : undefined,
+    vendor: typeof value.owned_by === "string" ? value.owned_by : undefined,
+    context_window: contextWindow,
+  });
+  info.nativeOperations = ["openai.chatCompletions"];
+  return info;
+}
