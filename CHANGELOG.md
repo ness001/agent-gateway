@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0
+
+- Scope Claude Code setup guidance to the CLI; Claude Desktop needs separate configuration.
+- Forward Anthropic `prompt_cache_key` as the VS Code model conversation ID.
+- Support browser cross-origin requests and include configured model aliases in discovery.
+
 ## 0.1.9
 
 - Add a persistent Agent Gateway sidebar with compact status, agent setup,
