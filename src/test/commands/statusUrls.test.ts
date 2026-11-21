@@ -8,7 +8,16 @@ import {
   shareActionItems,
   shareViaDevTunnel,
 } from "../../commands/share";
-import { apiUrlItems, showStatus, statusItems } from "../../commands/status";
+import {
+  STATUS_COMMANDS,
+  STATUS_GROUPS,
+  apiUrlItems,
+  showApiUrls,
+  showModels,
+  showStatus,
+  showStatusGroup,
+  statusItems,
+} from "../../commands/status";
 import type { Gateway } from "../../gateway/gateway";
 import type { HealthSnapshot } from "../../gateway/health";
 
@@ -35,6 +44,64 @@ function health(
   };
 }
 
+suite("commands/status dispatch", () => {
+  test("group menus offer only their actions and dispatch the selected command", async () => {
+    const quickPick = vscode.window.showQuickPick;
+    const executeCommand = vscode.commands.executeCommand;
+    const calls: string[] = [];
+    try {
+      Object.assign(vscode.commands, {
+        executeCommand: async (id: string) => calls.push(id),
+      });
+      for (const group of STATUS_GROUPS) {
+        Object.assign(vscode.window, {
+          showQuickPick: async (items: { action: string }[]) => {
+            assert.deepStrictEqual(
+              items.map((item) => item.action),
+              [...group.actions],
+            );
+            return items[0];
+          },
+        });
+        await showStatusGroup(group.id);
+        assert.strictEqual(calls.at(-1), STATUS_COMMANDS[group.actions[0]]);
+      }
+      Object.assign(vscode.window, { showQuickPick: async () => undefined });
+      await showStatusGroup("agentSetup");
+      assert.strictEqual(calls.length, STATUS_GROUPS.length);
+    } finally {
+      Object.assign(vscode.window, { showQuickPick: quickPick });
+      Object.assign(vscode.commands, { executeCommand });
+    }
+  });
+  test("every Status action dispatches its canonical registered command", async () => {
+    const quickPick = vscode.window.showQuickPick;
+    const executeCommand = vscode.commands.executeCommand;
+    const calls: string[] = [];
+    Object.assign(vscode.commands, {
+      executeCommand: async (id: string) => {
+        calls.push(id);
+      },
+    });
+    try {
+      for (const [action, command] of Object.entries(STATUS_COMMANDS)) {
+        Object.assign(vscode.window, {
+          showQuickPick: async () => ({ action }),
+        });
+        await showStatus({
+          health,
+          nativeModels: () => [],
+        } as unknown as Gateway);
+        assert.equal(calls.at(-1), command);
+      }
+      assert.equal(calls.length, Object.keys(STATUS_COMMANDS).length);
+    } finally {
+      Object.assign(vscode.window, { showQuickPick: quickPick });
+      Object.assign(vscode.commands, { executeCommand });
+    }
+  });
+});
+
 suite("commands/status sharing", () => {
   test("shows connection progress, verified model count and check failure", () => {
     const states: [DevTunnelSharingState, string][] = [
@@ -59,8 +126,8 @@ suite("commands/status sharing", () => {
       assert.strictEqual(
         items.find((i) => i.action === "share")?.label,
         state.status === "inactive"
-          ? "$(radio-tower) Start sharing via dev tunnel"
-          : "$(radio-tower) Manage sharing via dev tunnel",
+          ? "$(radio-tower) Share gateway via dev tunnel"
+          : "$(radio-tower) Manage dev tunnel sharing",
       );
       if (state.status === "connected") {
         assert.strictEqual(line?.detail, "Last connection check succeeded.");
@@ -198,7 +265,7 @@ suite("commands/status sharing", () => {
       statusItems(health(), "info", connection.state).find(
         (item) => item.action === "share",
       )?.label,
-      "$(radio-tower) Manage sharing via dev tunnel",
+      "$(radio-tower) Manage dev tunnel sharing",
     );
   });
 
@@ -348,7 +415,12 @@ suite("commands/status models", () => {
     try {
       await showStatus(
         { health, nativeModels: () => [...models] } as unknown as Gateway,
-        {} as Parameters<typeof showStatus>[1],
+        {
+          models: () =>
+            showModels({
+              nativeModels: () => [...models],
+            } as unknown as Gateway),
+        },
       );
       assert.strictEqual(picks, 2);
       assert.strictEqual(
@@ -386,7 +458,10 @@ suite("commands/status models", () => {
         });
         await showStatus(
           { health, nativeModels: () => models } as unknown as Gateway,
-          {} as Parameters<typeof showStatus>[1],
+          {
+            models: () =>
+              showModels({ nativeModels: () => models } as unknown as Gateway),
+          },
         );
         assert.strictEqual(picks, models.length === 0 ? 1 : 2);
         assert.strictEqual(await vscode.env.clipboard.readText(), clipboard);
@@ -473,7 +548,7 @@ suite("commands/status API URLs", () => {
     try {
       await showStatus(
         { health, nativeModels: () => [] } as unknown as Gateway,
-        {} as Parameters<typeof showStatus>[1],
+        { apiUrls: () => showApiUrls({ health } as unknown as Gateway) },
       );
       assert.strictEqual(
         await vscode.env.clipboard.readText(),

@@ -75,8 +75,8 @@ This adapter has focused configuration tests but is not yet verified live.
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | Codex            | `~/.codex/config.toml`                                                                                                          | discovered         |
 | Claude Code      | `~/.claude/settings.json`                                                                                                       | discovered         |
-| Oh My Pi (omp)   | `~/.omp/agent/models.yml`                                                                                                       | discovered         |
-| Pi               | `~/.pi/agent/models.json`                                                                                                       | written list       |
+| Oh My Pi (omp)   | `~/.omp/agent/models.yml`, `config.yml` (`.yaml` when that is the only file)                                                    | discovered         |
+| Pi               | `~/.pi/agent/models.json`, `settings.json`                                                                                      | written list       |
 | Hermes Agent     | `%LOCALAPPDATA%\hermes\config.yaml` on Windows, else `~/.hermes/config.yaml` (`HERMES_HOME` wins)                               | discovered         |
 | OpenClaw         | `~/.openclaw/openclaw.json`                                                                                                     | written list       |
 | Kilo Code        | `~/.config/kilo/kilo.jsonc` (or `kilo.json` when that is the only file)                                                         | written list       |
@@ -89,7 +89,12 @@ source, not a live install.
 
 Each changed file is backed up next to itself as
 `<file>.agent-gateway-<YYYYMMDDHHmmss>.bak`. Removing the gateway reverts only
-its own entries.
+its own entries. Oh My Pi sets global `modelRoles.default`, Pi sets global
+`defaultProvider` and `defaultModel`, Kilo sets top-level `model`, and Hermes
+sets `model.provider` and `model.default`. Each writes an
+`agent-gateway-default.json` file beside its config to record the prior default
+for removal. Project, session, and command-line selections can override global
+values. Antigravity and Cursor still need manual model selection.
 
 Codex configuration sets `model_catalog_url` inside
 `[model_providers.agent-gateway]` to the gateway's `/v1/models` endpoint and
@@ -104,15 +109,15 @@ restoration; unrelated features remain unchanged. Restart Codex after configurin
 Configure Coding Agents copies valid positive integer context capacities from the
 gateway model metadata, not from model names or output-token limits.
 
-| Agent | Context configuration |
-| --- | --- |
-| Claude Code | Selected model: `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS` |
-| Codex | Selected model: `model_context_window` |
-| Pi, OpenClaw, DeepSeek Harness | Per-model `contextWindow` in their existing model lists |
-| Kilo | Per-model `limit.context`, even when output metadata is unavailable |
-| Hermes | Per-model `providers.agent-gateway.models.<id>.context_length`; a user-pinned global context setting may take precedence |
-| Oh My Pi | Existing model discovery reads gateway metadata; no static override is written |
-| Cline CLI, Cursor, Antigravity | No verified context-setting support in these adapters; no override is written |
+| Agent                          | Context configuration                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Claude Code                    | Selected model: `env.CLAUDE_CODE_MAX_CONTEXT_TOKENS`                                                                     |
+| Codex                          | Selected model: `model_context_window`                                                                                   |
+| Pi, OpenClaw, DeepSeek Harness | Per-model `contextWindow` in their existing model lists                                                                  |
+| Kilo                           | Per-model `limit.context`, even when output metadata is unavailable                                                      |
+| Hermes                         | Per-model `providers.agent-gateway.models.<id>.context_length`; a user-pinned global context setting may take precedence |
+| Oh My Pi                       | Existing model discovery reads gateway metadata; no static override is written                                           |
+| Cline CLI, Cursor, Antigravity | No verified context-setting support in these adapters; no override is written                                            |
 
 Claude Code and Codex replace the existing context override and record it for
 restoration on unconfigure, including upgrades of older gateway configurations.
@@ -150,9 +155,9 @@ not select a different model. Errors from an existing model do not trigger fallb
 Gemini requests do not fall back, except through aliases. **Status** and `/health`
 (`fallbackModel`) show the model in use.
 
-`agentGateway.modelMappings` maps a requested name to one of your models for
-every API, for example `{"my-model": "gpt-5.6-sol"}`. Built-in aliases cover
-Gemini CLI's internal model names (`gemini-3-flash-preview`,
+`agentGateway.modelMappings` maps a requested name to a local or remote model
+that supports the requested API, for example `{"my-model": "gpt-5.6-sol"}`.
+Built-in aliases cover Gemini CLI's internal model names (`gemini-3-flash-preview`,
 `gemini-2.5-flash`, `gemini-2.5-flash-lite` and Antigravity CLI's
 `gemini-3.1-flash-lite-preview` go to your best Gemini Flash model;
 `gemini-3-pro-preview` and `gemini-2.5-pro` to your best Gemini Pro model;
@@ -176,15 +181,15 @@ can search and then call a tool (for example write a file) in the same turn.
 
 ### Engines
 
-| Engine    | Search without a key             | Fetch endpoint                        | Fetch without a key  | Key header              |
-| --------- | -------------------------------- | ------------------------------------- | -------------------- | ----------------------- |
-| Exa       | Works (public MCP, rate-limited) | MCP `web_fetch_exa`; REST `/contents` | Works                | `x-api-key`             |
-| Firecrawl | Works (rate-limited)             | `/v2/scrape`                          | Works (rate-limited) | `Authorization: Bearer` |
-| Tavily    | Needs a key                      | `/extract`                            | Needs a key          | `Authorization: Bearer` |
-| Jina AI   | Needs a key                      | Reader `r.jina.ai`                    | Works (rate-limited) | `Authorization: Bearer` |
-| You.com   | Needs a key                      | `/v1/contents`                        | Needs a key          | `X-API-Key`             |
-| Brave Search | Needs a key | Not supported | Not supported | `X-Subscription-Token` |
-| Kagi | Needs a key | `/api/v1/extract` | Needs a key | `Authorization: Bearer` |
+| Engine       | Search without a key             | Fetch endpoint                        | Fetch without a key  | Key header              |
+| ------------ | -------------------------------- | ------------------------------------- | -------------------- | ----------------------- |
+| Exa          | Works (public MCP, rate-limited) | MCP `web_fetch_exa`; REST `/contents` | Works                | `x-api-key`             |
+| Firecrawl    | Works (rate-limited)             | `/v2/scrape`                          | Works (rate-limited) | `Authorization: Bearer` |
+| Tavily       | Needs a key                      | `/extract`                            | Needs a key          | `Authorization: Bearer` |
+| Jina AI      | Needs a key                      | Reader `r.jina.ai`                    | Works (rate-limited) | `Authorization: Bearer` |
+| You.com      | Needs a key                      | `/v1/contents`                        | Needs a key          | `X-API-Key`             |
+| Brave Search | Needs a key                      | Not supported                         | Not supported        | `X-Subscription-Token`  |
+| Kagi         | Needs a key                      | `/api/v1/extract`                     | Needs a key          | `Authorization: Bearer` |
 
 Brave Search uses the [Web Search API](https://api-dashboard.search.brave.com/documentation/services/web-search) and does not support URL fetch. No other provider is contacted for fetches.
 Kagi uses the [v1 Search and Extract APIs](https://kagi.com/api/docs/openapi), not the deprecated v0 API. Both providers require their own API key and API access/billing.
@@ -260,14 +265,12 @@ OpenAI and Gemini clients get 503 (`service_unavailable_error` /
   `[remote][<upstream-name>]`. Settings describe forwarded metadata, not what
   the remote model applied; no prompt, stop text or cache-key value is included.
   `debug` adds provider error messages.
-- **Status** > **Change log level**: select `error`, `warn`, `info`, or `debug`.
+- **Status** > **Set log level**: select `error`, `warning`, `info`, or `debug`.
   Applies immediately without restarting; updates an existing workspace override,
   otherwise your user setting. For debug output, also select Debug for the
   Agent Gateway output channel in VS Code if its log filter hides those messages.
 - **Error log** (**Status** > **Open error log**): one JSON line per failed
   request, kept for 7 days.
-- **Status** > **Copy health details**: the `/health` snapshot with recent
-  errors.
 
 Prompts, request bodies, tool arguments, search queries, URLs, page text and
 credentials are never logged.

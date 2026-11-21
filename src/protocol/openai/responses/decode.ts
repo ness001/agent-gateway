@@ -764,7 +764,7 @@ function decodeToolChoice(
         // Forced hosted search that cannot run.
         throw new GatewayError(
           "tool_unavailable",
-          `Hosted tool '${v.type}' is not available; configure a provider with the "Agent Gateway: Web Search and Fetch" command.`,
+          `Hosted tool '${v.type}' is not available; configure a provider with the "Agent Gateway: Set Web Search Engine" command.`,
           { param: "tool_choice" },
         );
       }
@@ -853,7 +853,7 @@ export function decodeResponses(
   const hosted = hostedSearch ? decodedTools.hosted : [];
   if (!hostedSearch && decodedTools.hosted.length) {
     opts.logger?.info(
-      "openai-responses dropped web search: no web search engine is set (run Web Search and Fetch)",
+      "openai-responses dropped web search: no web search engine is set (run Set Web Search Engine)",
     );
   }
 

@@ -69,6 +69,7 @@ const real = {
       dispose() {},
     }),
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
+    registerWebviewViewProvider: disposable,
   },
   commands: { registerCommand: disposable, executeCommand: async () => {} },
   workspace: {

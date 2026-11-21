@@ -6,7 +6,7 @@ import {
   clampMaxSearchesPerRequest,
 } from "../protocol/hosted/catalog";
 
-export type GatewayLogLevel = "error" | "warn" | "info" | "debug";
+export type GatewayLogLevel = "error" | "warning" | "info" | "debug";
 export type WebSearchProviderName =
   | "none"
   | "exa"

@@ -213,8 +213,8 @@ export interface AliasOptions {
  * Resolves a requested model that has no route through the model aliases.
  * Order: user alias (exact target; empty disables), the configured search
  * model for hosted-search side requests, then the built-in Gemini CLI names
- * (best local Gemini Flash/Pro, else the fallback model). Explicit alias and
- * search targets stay local; the configured fallback may be remote. Targets
+ * (best local Gemini Flash/Pro, else the fallback model). Explicit aliases and
+ * the configured fallback may be remote; search targets stay local. Targets
  * that do not serve the operation are skipped.
  */
 export function resolveModelAlias(
@@ -223,9 +223,9 @@ export function resolveModelAlias(
   opts: AliasOptions,
 ): CatalogEntry | undefined {
   const serves = (e: CatalogEntry | undefined) =>
-    e && e.remote === undefined && e.operations.includes(opts.operation)
-      ? e
-      : undefined;
+    e && e.operations.includes(opts.operation) ? e : undefined;
+  const servesLocally = (e: CatalogEntry | undefined) =>
+    e?.remote === undefined ? serves(e) : undefined;
   const user = opts.userAliases;
   if (user && Object.prototype.hasOwnProperty.call(user, model)) {
     const target = user[model];
@@ -242,7 +242,7 @@ export function resolveModelAlias(
   }
   const configured = opts.hostedSearch ? opts.searchModel?.trim() : undefined;
   if (configured) {
-    const found = serves(
+    const found = servesLocally(
       resolveModel(reg, configured, { allowFallback: false })?.entry,
     );
     if (found) {

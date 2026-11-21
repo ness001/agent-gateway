@@ -1,0 +1,60 @@
+name: Tag package version
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: tag-package-version
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Create tag when the package version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          version="$(node -p "require('./package.json').version")"
+          tag="v$version"
+
+          tag_sha="$(git ls-remote --tags origin "refs/tags/$tag^{}" | cut -f1)"
+          if [ -z "$tag_sha" ]; then
+            tag_sha="$(git ls-remote --tags origin "refs/tags/$tag" | cut -f1)"
+          fi
+          target_sha="${tag_sha:-$sha}"
+
+          conclusion="$(gh run list --workflow ci.yml --commit "$target_sha" \
+            --json conclusion,status \
+            -q '[.[] | select(.status == "completed")][0].conclusion')"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI has not passed for $target_sha (latest result: ${conclusion:-none}); refusing to release $tag."
+            exit 1
+          fi
+
+          if [ -z "$tag_sha" ]; then
+            git tag "$tag" "$sha"
+            git push origin "refs/tags/$tag"
+          fi
+
+          release_run="$(gh run list --workflow release.yml --branch "$tag" \
+            --json databaseId,headSha \
+            -q "[.[] | select(.headSha == \"$target_sha\")][0].databaseId")"
+          if [ -n "$release_run" ]; then
+            echo "$tag already has release workflow run $release_run; nothing to do."
+            exit 0
+          fi
+
+          gh workflow run release.yml --ref "$tag"

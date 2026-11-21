@@ -52,7 +52,7 @@ export async function setWebSearchEngine(
   const current = readConfiguration().webSearch.provider;
   const items = webSearchEngineItems(current);
   const picked = await vscode.window.showQuickPick(items, {
-    title: "Web Search and Fetch: engine",
+    title: "Set Web Search Engine",
     ignoreFocusOut: true,
   });
   if (!picked) {

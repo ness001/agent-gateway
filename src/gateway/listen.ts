@@ -1,6 +1,8 @@
 import { type ServerType, serve } from "@hono/node-server";
 import type { Server } from "node:http";
 
+import type { HealthSnapshot } from "./health";
+
 export const LOOPBACK_HOST = "127.0.0.1";
 
 export type PortOccupant = "extension" | "other-gateway" | "unknown";
@@ -89,6 +91,50 @@ export async function probeOccupant(
     }
   }
   return "unknown";
+}
+
+/** Read shared health without following redirects or sending credentials elsewhere. */
+export async function sharedHealth(
+  port: number,
+  apiKey?: string,
+): Promise<HealthSnapshot | undefined> {
+  try {
+    const response = await fetch(`http://${LOOPBACK_HOST}:${port}/health`, {
+      headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+      redirect: "manual",
+      signal: AbortSignal.timeout(1500),
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const h = (await response.json()) as HealthSnapshot;
+    if (
+      typeof h.bridgeVersion !== "string" ||
+      ![
+        "Starting",
+        "Ready",
+        "Waiting for Copilot",
+        "Port conflict",
+        "Error",
+        "Disabled",
+      ].includes(h.status) ||
+      typeof h.listener?.active !== "boolean" ||
+      typeof h.copilot?.installed !== "boolean" ||
+      !Number.isFinite(h.modelCount) ||
+      !Array.isArray(h.remotes)
+    ) {
+      return undefined;
+    }
+    return {
+      ...h,
+      listener: {
+        active: h.listener.active,
+        address: `http://${LOOPBACK_HOST}:${port}`,
+      },
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function start(

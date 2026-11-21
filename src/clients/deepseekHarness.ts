@@ -2,6 +2,9 @@ import * as path from "path";
 import { YAMLMap, YAMLSeq, isMap, isSeq, parseDocument } from "yaml";
 
 import { validContextWindow } from "./contextWindow";
+import { toolModels } from "./defaults";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey } from "./defaults";
 import {
   ClientAdapter,
   ClientConfigInput,
@@ -9,7 +12,6 @@ import {
   GATEWAY_PROVIDER_ID,
   GATEWAY_PROVIDER_NAME,
   GatewayModel,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 // DeepSeek Harness (`dsh`, npm @deepseek-ai/dsh) composes each profile from
@@ -41,7 +43,7 @@ function patchPath(home: string, platform: NodeJS.Platform): string {
 }
 
 function agentModels(models: GatewayModel[]): GatewayModel[] {
-  return models.filter((m) => m.supportsToolCalling !== false);
+  return toolModels(models);
 }
 
 function findEntry(seq: YAMLSeq, id: string): YAMLMap | undefined {
@@ -97,11 +99,11 @@ function load(text: string | undefined): {
 function route(input: ClientConfigInput) {
   return {
     displayName: GATEWAY_PROVIDER_NAME,
-    api: "anthropic-messages",
+    api: CLIENT_DEFAULTS.deepseekHarness.api,
     baseURL: input.gatewayUrl,
     // A literal header keeps the secret out of the environment; pi-ai sends
     // it as-is (apiKeyEnv would need a variable set in every shell).
-    headers: { "x-api-key": input.apiKey || PLACEHOLDER_API_KEY },
+    headers: { "x-api-key": gatewayApiKey(input) },
     models: agentModels(input.models).map((m) => {
       const entry: Record<string, unknown> = {
         id: m.id,
@@ -134,6 +136,7 @@ export const deepseekHarnessAdapter: ClientAdapter = {
     const { doc, seq, error } = load(before);
     if (!seq) {
       return {
+        blocked: "DeepSeek Harness configuration needs manual repair.",
         changes: [],
         summary: [`Cannot safely edit ${p}: ${error}.`],
         manualSteps: [
@@ -192,6 +195,7 @@ export const deepseekHarnessAdapter: ClientAdapter = {
     const { doc, seq } = load(before);
     if (!seq) {
       return {
+        blocked: "DeepSeek Harness configuration needs manual repair.",
         changes: [],
         summary: [`Cannot parse ${p}; nothing removed.`],
       };

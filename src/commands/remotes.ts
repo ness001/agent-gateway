@@ -33,14 +33,14 @@ export interface RemoteListItem {
   url?: string;
 }
 
-/** Items for Manage Remote Upstreams: "Add" first, then each configured remote with its state. */
+/** Items for Manage Remote Gateways: "Add" first, then each configured remote with its state. */
 export function remoteListItems(
   configured: { name: string; url: string }[],
   states: RemoteState[],
 ): RemoteListItem[] {
   return [
     {
-      label: "$(add) Add remote upstream...",
+      label: "$(add) Add remote gateway...",
       detail: "Use another machine's shared gateway (e.g. a dev tunnel URL)",
     },
     ...configured.map((r) => ({
@@ -85,14 +85,12 @@ export async function setRemoteApiKey(
 ): Promise<void> {
   const names = gw.remoteNames();
   if (names.length === 0) {
-    void vscode.window.showWarningMessage(
-      "No remote upstreams are configured.",
-    );
+    void vscode.window.showWarningMessage("No remote gateways are configured.");
     return;
   }
   const name =
     target ??
-    (await vscode.window.showQuickPick(names, { title: "Remote upstream" }));
+    (await vscode.window.showQuickPick(names, { title: "Remote gateway" }));
   if (!name) {
     return;
   }
@@ -188,7 +186,7 @@ export async function manageRemoteUpstreams(
     .inspect<unknown[]>("remoteUpstreams")?.globalValue;
   const picked = await vscode.window.showQuickPick(
     remoteListItems(configuredRemotes(current), gw.health().remotes),
-    { title: "Manage Remote Upstreams" },
+    { title: "Manage Remote Gateways" },
   );
   if (!picked) {
     return;
@@ -204,7 +202,7 @@ export async function manageRemoteUpstreams(
       { label: "$(link) Change URL", id: "url" },
       { label: "$(trash) Remove", id: "remove" },
     ],
-    { title: `Remote upstream '${name}' (${url})` },
+    { title: `Remote gateway '${name}' (${url})` },
   );
   switch (action?.id) {
     case "test":
@@ -231,7 +229,7 @@ export async function addRemoteUpstream(
   const current = config.inspect<unknown[]>("remoteUpstreams")?.globalValue;
   const existing = configuredRemoteNames(current);
   const rawUrl = await vscode.window.showInputBox({
-    title: "Add Remote Upstream (1/3)",
+    title: "Add Remote Gateway (1/3)",
     prompt: "Remote gateway URL, e.g. a dev tunnel URL",
     ignoreFocusOut: true,
     validateInput: (v) => {
@@ -248,7 +246,7 @@ export async function addRemoteUpstream(
   }
   const url = parsed.url;
   const name = await vscode.window.showInputBox({
-    title: "Add Remote Upstream (2/3)",
+    title: "Add Remote Gateway (2/3)",
     prompt: "Name (models appear as <name>--<modelId>)",
     value: deriveRemoteName(url),
     ignoreFocusOut: true,
@@ -268,7 +266,7 @@ export async function addRemoteUpstream(
     }
   }
   const apiKey = await vscode.window.showInputBox({
-    title: "Add Remote Upstream (3/3)",
+    title: "Add Remote Gateway (3/3)",
     prompt: "API key of the remote gateway (leave empty if none)",
     password: true,
     ignoreFocusOut: true,
@@ -329,7 +327,7 @@ export async function removeRemoteUpstream(
   const names = configuredRemoteNames(current);
   if (names.length === 0) {
     void vscode.window.showWarningMessage(
-      "No remote upstreams are configured in user settings.",
+      "No remote gateways are configured in user settings.",
     );
     return;
   }
@@ -337,7 +335,7 @@ export async function removeRemoteUpstream(
     target && names.includes(target)
       ? target
       : await vscode.window.showQuickPick(names, {
-          title: "Remove remote upstream",
+          title: "Remove remote gateway",
         });
   if (!name) {
     return;

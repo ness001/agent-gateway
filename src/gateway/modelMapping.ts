@@ -24,7 +24,6 @@ export function mappingCandidates(
 ): CatalogEntry[] {
   return models.filter(
     (m) =>
-      m.remote === undefined &&
       !m.isAlias &&
       m.supportsToolCalling !== false &&
       m.operations.includes("anthropic.messages"),

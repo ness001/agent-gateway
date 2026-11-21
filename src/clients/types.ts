@@ -34,6 +34,8 @@ export interface PlannedFileChange {
 }
 
 export interface ClientPlan {
+  /** Explicit refusal: an empty change list must not be interpreted as a match. */
+  blocked?: string;
   changes: PlannedFileChange[];
   /** One-line human summaries shown before applying. */
   summary: string[];
@@ -68,8 +70,8 @@ export interface ClientAdapter {
   ): ClientPlan;
 }
 
-/** Provider/entry name written into every client config. */
-export const GATEWAY_PROVIDER_ID = "agent-gateway";
-export const GATEWAY_PROVIDER_NAME = "Agent Gateway";
-/** Written when the gateway has no API key; the gateway strips caller credentials. */
-export const PLACEHOLDER_API_KEY = "local-gateway-client";
+export {
+  GATEWAY_PROVIDER_ID,
+  GATEWAY_PROVIDER_NAME,
+  PLACEHOLDER_API_KEY,
+} from "./defaults";

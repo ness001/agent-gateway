@@ -1,4 +1,6 @@
 import * as assert from "node:assert/strict";
+import * as http from "node:http";
+import type { AddressInfo, LookupFunction } from "node:net";
 
 import type {
   CoreLogger,
@@ -11,6 +13,8 @@ import {
   downloadImage,
   resolveImageLinks,
 } from "../../../protocol/hosted/imageLinks";
+
+import dns = require("node:dns");
 
 const PNG: Uint8Array<ArrayBuffer> = new Uint8Array([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13,
@@ -50,6 +54,42 @@ const kindOf = async (p: Promise<unknown>): Promise<string> => {
 const signal = () => new AbortController().signal;
 
 suite("protocol/hosted/imageLinks", () => {
+  test("DNS resolving a public-looking image hostname to loopback is rejected before GET", async () => {
+    let hits = 0;
+    const server = http.createServer((_req, res) => {
+      hits++;
+      res.end(PNG);
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const original = dns.lookup;
+    const lookup: LookupFunction = (_host, options, callback) => {
+      if (options.all) {
+        callback(null, [{ address: "127.0.0.1", family: 4 }]);
+      } else {
+        callback(null, "127.0.0.1", 4);
+      }
+    };
+    dns.lookup = lookup as typeof dns.lookup;
+    try {
+      const port = (server.address() as AddressInfo).port;
+      assert.equal(
+        await kindOf(
+          downloadImage(`http://image.attacker.test:${port}/x`, {
+            signal: signal(),
+          }),
+        ),
+        "unsafe",
+      );
+      assert.equal(hits, 0);
+    } finally {
+      dns.lookup = original;
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   test("PNG served as application/octet-stream is sniffed as image/png", async () => {
     const f = stub({ [URL_A]: () => ok(PNG) });
     const img = await downloadImage(URL_A, { signal: signal(), fetch: f });

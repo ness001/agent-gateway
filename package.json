@@ -2,7 +2,7 @@
   "name": "agent-gateway",
   "displayName": "Agent Gateway",
   "description": "Use your GitHub Copilot models in any agent through one local gateway, share them across machines, and enable web search, compatible with all tool calls. Works with Claude Code, Codex, Gemini CLI, Antigravity CLI, Kilo Code, Cline, DeepSeek Harness, Pi, Oh My Pi, Hermes and OpenClaw.",
-  "version": "0.1.7",
+  "version": "0.20.0",
   "publisher": "ness001",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -74,12 +74,17 @@
           "type": "string",
           "enum": [
             "error",
-            "warn",
+            "warning",
             "info",
             "debug"
           ],
           "default": "info",
           "description": "Gateway log level."
+        },
+        "agentGateway.devTunnel.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the devtunnel executable for sharing the gateway. Empty searches PATH and WinGet Links."
         },
         "agentGateway.remoteUpstreams": {
           "type": "array",
@@ -127,7 +132,7 @@
             "Kagi: search and URL fetch require an API key."
           ],
           "default": "none",
-          "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Web Search and Fetch** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."
+          "markdownDescription": "Hosted web-search and URL-fetch engine (Gemini `urlContext` fetches pages through it). Use **Agent Gateway: Set Web Search Engine** to pick one and store its API key. While `none`, web-search requests fail and no search service is contacted."
         },
         "agentGateway.webSearch.model": {
           "type": "string",
@@ -166,7 +171,62 @@
         }
       }
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentGateway",
+          "title": "Agent Gateway",
+          "icon": "images/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentGateway": [
+        {
+          "id": "agentGateway.status",
+          "name": "Agent Gateway",
+          "type": "webview",
+          "contextualTitle": "Agent Gateway"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "agentGateway.showModels",
+        "title": "Show Models",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.showApiUrls",
+        "title": "Show API URLs",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setLogLevel",
+        "title": "Set Log Level",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.setGatewayApiKey",
+        "title": "Set Gateway API Key",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.openSidebar",
+        "title": "Open Sidebar",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.refreshStatus",
+        "title": "Refresh Status",
+        "category": "Agent Gateway",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "agentGateway.showOutput",
+        "title": "Open Output Log",
+        "category": "Agent Gateway"
+      },
       {
         "command": "agentGateway.showStatus",
         "title": "Status",
@@ -194,7 +254,7 @@
       },
       {
         "command": "agentGateway.setWebSearchEngine",
-        "title": "Web Search and Fetch",
+        "title": "Set Web Search Engine",
         "category": "Agent Gateway"
       },
       {
@@ -204,7 +264,7 @@
       },
       {
         "command": "agentGateway.manageRemoteUpstreams",
-        "title": "Manage Remote Upstreams",
+        "title": "Manage Remote Gateways",
         "category": "Agent Gateway"
       },
       {
@@ -215,11 +275,6 @@
       {
         "command": "agentGateway.setRemoteApiKey",
         "title": "Set Remote Upstream API Key",
-        "category": "Agent Gateway"
-      },
-      {
-        "command": "agentGateway.copyHealth",
-        "title": "Copy Health Details",
         "category": "Agent Gateway"
       },
       {
@@ -246,20 +301,86 @@
         "command": "agentGateway.setWebSearchApiKey",
         "title": "Set Web Search Engine",
         "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.agentSetup",
+        "title": "Agent Setup",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.connections",
+        "title": "Connections",
+        "category": "Agent Gateway"
+      },
+      {
+        "command": "agentGateway.diagnostics",
+        "title": "Diagnostics",
+        "category": "Agent Gateway"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "agentGateway.refreshStatus",
+          "when": "view == agentGateway.status",
+          "group": "navigation"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "agentGateway.showModels",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.showApiUrls",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setLogLevel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setGatewayApiKey",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.refreshStatus",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.showOutput",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.changePort",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setFallbackModel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.configureClients",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.setWebSearchEngine",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.shareViaDevTunnel",
+          "when": "false"
+        },
+        {
+          "command": "agentGateway.manageRemoteUpstreams",
+          "when": "false"
+        },
         {
           "command": "agentGateway.setApiKey",
           "when": "false"
         },
         {
           "command": "agentGateway.setRemoteApiKey",
-          "when": "false"
-        },
-        {
-          "command": "agentGateway.copyHealth",
           "when": "false"
         },
         {

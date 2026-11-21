@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.20.0
+
+- Scope Claude Code setup guidance to the CLI; Claude Desktop needs separate configuration.
+- Forward Anthropic `prompt_cache_key` as the VS Code model conversation ID.
+- Support browser cross-origin requests and include configured model aliases in discovery.
+
+## 0.1.9
+
+- Add a persistent Agent Gateway sidebar with compact status, agent setup,
+  connections, and diagnostics groups in one scrolling view.
+- Share gateway status across VS Code windows and take over when the hosting
+  window closes instead of reporting a duplicate gateway as a port conflict.
+- Group Command Palette actions and open error logs directly in the editor.
+- Explain client configuration differences against shared defaults and offer
+  redacted previews before selecting or applying updates.
+- Keep shared model choices unchanged when configuration is cancelled or fails;
+  avoid false differences from formatting and restoration records.
+- Reject image downloads whose DNS addresses point to private networks,
+  including redirect destinations.
+- Use `warning` as the gateway log-level setting value.
+
+## 0.1.8
+
+- Distinguish a missing devtunnel CLI from timeouts, launch failures, and nonzero
+  exits, with safe diagnostics instead of an incorrect "CLI not found" message.
+- Allow a full path to the devtunnel CLI with `agentGateway.devTunnel.cliPath`,
+  including paths with spaces, and use it for interactive login.
+
 ## 0.1.7
 
 - Simplify the Status panel: hide recent errors (use Open error log) and

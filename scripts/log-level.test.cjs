@@ -23,11 +23,11 @@ Module._load = original;
 function reset() { current = "info"; selection = "debug"; workspaceValue = undefined; fail = false; updates = []; notices = []; }
 
 test("picker lists supported levels and marks current", () => {
-  const items = logLevelItems("warn");
-  assert.deepEqual(items.map(i => i.label), ["error", "warn", "info", "debug"]);
-  assert.deepEqual(items.filter(i => i.picked).map(i => i.label), ["warn"]);
+  const items = logLevelItems("warning");
+  assert.deepEqual(items.map(i => i.label), ["error", "warning", "info", "debug"]);
+  assert.deepEqual(items.filter(i => i.picked).map(i => i.label), ["warning"]);
 });
-for (const level of ["error", "warn", "debug"]) {
+for (const level of ["error", "warning", "debug"]) {
   test(`persists ${level} to user settings`, async () => {
     reset(); selection = level;
     await changeLogLevel();

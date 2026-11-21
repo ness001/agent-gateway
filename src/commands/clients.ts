@@ -3,6 +3,12 @@ import * as os from "node:os";
 import * as vscode from "vscode";
 
 import { applyPlan, loadFiles, redactSecrets } from "../clients/apply";
+import { CLIENT_DEFAULTS, sharedDefaultModel } from "../clients/defaults";
+import {
+  describeDifferences,
+  redactConfigCredentials,
+  settingDifferences,
+} from "../clients/differences";
 import { ALL_CLIENT_ADAPTERS, DISCOVERY_LABELS } from "../clients/index";
 import type {
   ClientAdapter,
@@ -15,7 +21,7 @@ import type { CatalogEntry } from "../gateway/types";
 import { LLM_API_KEY_SECRET_KEY } from "../utils/constant";
 import { logger } from "../utils/logger";
 
-const LAST_MODEL_KEY = "agentGateway.configureClients.defaultModel";
+const LAST_MODEL_KEY = CLIENT_DEFAULTS.modelStateKey;
 
 export function toGatewayModel(e: CatalogEntry): GatewayModel {
   return {
@@ -28,43 +34,59 @@ export function toGatewayModel(e: CatalogEntry): GatewayModel {
   };
 }
 
-export type ClientConfigState = "up to date" | "configured" | "not configured";
+export type ClientConfigState =
+  | "up to date"
+  | "configured"
+  | "not configured"
+  | "manual verification needed"
+  | "invalid configuration";
 
-/**
- * Whether the gateway is set up in a client's config files. plan() producing no
- * file change means the config already matches (up to date); otherwise
- * unplan() producing a change means our entries are present (configured, but
- * stale: different port, key or model list). Both are pure, so this only
- * costs reading the config files once.
- */
+/** Compare managed values with the shared target; restore records and formatting are ignored. */
 export function clientConfigState(
   adapter: ClientAdapter,
   input: ClientConfigInput,
   files: Record<string, string | undefined>,
 ): ClientConfigState {
-  const changes = (p: ClientPlan) =>
-    p.changes.filter((c) => c.before !== c.after).length;
-  if (
-    adapter.discovery !== "manual" &&
-    changes(adapter.plan(input, files)) === 0
-  ) {
-    return "up to date";
+  if (adapter.discovery === "manual") {
+    return "manual verification needed";
   }
-  return changes(adapter.unplan(input, files)) > 0
-    ? "configured"
-    : "not configured";
+  try {
+    const plan = adapter.plan(input, files);
+    if (plan.blocked) {
+      return "invalid configuration";
+    }
+    if (settingDifferences(plan).length === 0) {
+      return "up to date";
+    }
+    return adapter
+      .unplan(input, files)
+      .changes.some((c) => c.before !== c.after)
+      ? "configured"
+      : "not configured";
+  } catch {
+    return "invalid configuration";
+  }
 }
 
 export function clientItemDescription(
   installed: boolean,
   discovery: ClientAdapter["discovery"],
   state: ClientConfigState | undefined,
+  differences: string[] = [],
 ): string {
-  return [
-    state ? (state === "configured" ? "configured (outdated)" : state) : "",
-    installed ? "installed" : "",
-    DISCOVERY_LABELS[discovery],
-  ]
+  const status =
+    state === "up to date"
+      ? "Configured — matches shared gateway defaults"
+      : state === "configured"
+        ? `Differs from shared gateway defaults: ${differences.length ? differences.join(", ") : "configuration files"}`
+        : state === "invalid configuration"
+          ? "Invalid configuration — repair required"
+          : state === "manual verification needed"
+            ? "Manual verification needed"
+            : state === "not configured"
+              ? "Not configured"
+              : "Configuration could not be read";
+  return [status, installed ? "installed" : "", DISCOVERY_LABELS[discovery]]
     .filter(Boolean)
     .join(" · ");
 }
@@ -104,26 +126,95 @@ async function pickClients(
         .detectPaths(home, process.platform)
         .some((p) => existsSync(p));
       let state: ClientConfigState | undefined;
+      let differences: string[] = [];
+      let paths: string[] = [];
       try {
         const files = await loadFiles(a.configPaths(home, process.platform));
         state = clientConfigState(a, input, files);
+        if (state === "configured") {
+          const plan = a.plan(input, files);
+          differences = describeDifferences(plan);
+          paths = plan.changes
+            .filter((c) => c.before !== c.after)
+            .map((c) => c.path);
+        }
       } catch {
         state = undefined;
       }
       return {
         label: a.label,
-        description: clientItemDescription(installed, a.discovery, state),
-        detail: a.caveat,
+        description: clientItemDescription(
+          installed,
+          a.discovery,
+          state,
+          differences,
+        ),
+        detail: [
+          paths.length
+            ? `Differs from shared gateway defaults: ${paths.join(", ")}. Review differences before applying; existing choices may be intentional.`
+            : "",
+          a.caveat,
+        ]
+          .filter(Boolean)
+          .join(" "),
         picked: pickedByDefault(state),
         adapter: a,
       };
     }),
   );
-  const picked = await vscode.window.showQuickPick(items, {
-    canPickMany: true,
-    title: `${verb}: select coding agents`,
+  const picker = vscode.window.createQuickPick<(typeof items)[number]>();
+  picker.canSelectMany = true;
+  picker.ignoreFocusOut = true;
+  picker.title = `${verb}: select coding agents`;
+  picker.placeholder = `Shared target: ${input.defaultModel}. Use the diff button to preview without applying.`;
+  picker.items = items.map((item) => ({
+    ...item,
+    buttons: [
+      {
+        iconPath: new vscode.ThemeIcon("diff"),
+        tooltip: "Preview differences",
+      },
+    ],
+  }));
+  picker.selectedItems = picker.items.filter((item) => item.picked);
+  return new Promise((resolve) => {
+    const subscriptions = [
+      picker.onDidAccept(() => {
+        const selected = picker.selectedItems.map((item) => item.adapter);
+        resolve(selected.length ? selected : undefined);
+        picker.hide();
+      }),
+      picker.onDidHide(() => {
+        resolve(undefined);
+        subscriptions.forEach((subscription) => subscription.dispose());
+        picker.dispose();
+      }),
+      picker.onDidTriggerItemButton(async ({ item }) => {
+        try {
+          const files = await loadFiles(
+            item.adapter.configPaths(home, process.platform),
+          );
+          const plan = item.adapter.plan(input, files);
+          if (plan.blocked) {
+            void vscode.window.showWarningMessage(plan.blocked);
+          } else if (
+            !plan.changes.some((change) => change.before !== change.after)
+          ) {
+            void vscode.window.showInformationMessage(
+              `${item.label} matches shared gateway defaults (model: ${input.defaultModel}).`,
+            );
+          } else {
+            await showDiffs([[item.adapter, plan]], [input.apiKey]);
+          }
+        } catch (error) {
+          void vscode.window.showErrorMessage(
+            `Cannot preview ${item.label}: ${error instanceof Error ? error.message : "configuration could not be read"}`,
+          );
+        }
+      }),
+    ];
+    picker.show();
   });
-  return picked?.length ? picked.map((p) => p.adapter) : undefined;
 }
 
 async function pickDefaultModel(
@@ -132,19 +223,13 @@ async function pickDefaultModel(
 ): Promise<string | undefined> {
   const sorted = [...models].sort((a, b) => a.id.localeCompare(b.id));
   const previous = context.globalState.get<string>(LAST_MODEL_KEY);
-  const preferred =
-    sorted.find((m) => m.id === previous) ??
-    sorted.find((m) => m.id.startsWith("claude-")) ??
-    sorted[0];
+  const preferred = sharedDefaultModel(models, previous)!;
   const items = [preferred, ...sorted.filter((m) => m !== preferred)].map(
     (m) => ({ label: m.id, description: m.displayName }),
   );
   const picked = await vscode.window.showQuickPick(items, {
-    title: "Default model for the selected agents",
+    title: "Shared default model for coding agents (saved after applying)",
   });
-  if (picked) {
-    await context.globalState.update(LAST_MODEL_KEY, picked.label);
-  }
   return picked?.label;
 }
 
@@ -158,10 +243,12 @@ async function showDiffs(
         continue;
       }
       const left = await vscode.workspace.openTextDocument({
-        content: redactSecrets(c.before ?? "", secrets),
+        content: redactConfigCredentials(
+          redactSecrets(c.before ?? "", secrets),
+        ),
       });
       const right = await vscode.workspace.openTextDocument({
-        content: redactSecrets(c.after ?? "", secrets),
+        content: redactConfigCredentials(redactSecrets(c.after ?? "", secrets)),
       });
       await vscode.commands.executeCommand(
         "vscode.diff",
@@ -196,8 +283,7 @@ export async function runClientConfiguration(
     gatewayUrl: `http://127.0.0.1:${port}`,
     apiKey: (await context.secrets.get(LLM_API_KEY_SECRET_KEY)) || undefined,
     models,
-    defaultModel:
-      models.find((m) => m.id === previous)?.id ?? models[0]?.id ?? "",
+    defaultModel: sharedDefaultModel(models, previous)?.id ?? "",
     home,
     platform: process.platform,
   };
@@ -246,10 +332,12 @@ export async function runClientConfiguration(
   for (const a of adapters) {
     try {
       const files = await loadFiles(a.configPaths(home, process.platform));
-      plans.push([
-        a,
-        mode === "configure" ? a.plan(input, files) : a.unplan(input, files),
-      ]);
+      const plan =
+        mode === "configure" ? a.plan(input, files) : a.unplan(input, files);
+      if (plan.blocked) {
+        throw new Error(plan.blocked);
+      }
+      plans.push([a, plan]);
     } catch (err) {
       failures.push(`${a.label}: ${(err as Error).message}`);
     }
@@ -261,7 +349,13 @@ export async function runClientConfiguration(
   const preview = [
     ...plans
       .filter(([, p]) => p.changes.some((c) => c.before !== c.after))
-      .map(([a]) => `- ${a.label}`),
+      .map(
+        ([a, plan]) =>
+          `- ${a.label}: ${describeDifferences(plan).join(", ")}\n${plan.changes
+            .filter((c) => c.before !== c.after)
+            .map((c) => `  ${c.path}`)
+            .join("\n")}`,
+      ),
     ...failures.map((f) => `Skipped ${f}`),
   ].join("\n");
 
@@ -272,9 +366,9 @@ export async function runClientConfiguration(
       verb,
       { modal: true, detail: preview },
       apply,
-      "Show diff",
+      "Review differences",
     );
-    if (choice === "Show diff") {
+    if (choice === "Review differences") {
       await showDiffs(plans, [input.apiKey]);
       // A picker that stays open while the diff editors are scrolled
       // (a modal blocks them; a notification hides itself).
@@ -303,6 +397,15 @@ export async function runClientConfiguration(
       );
       return;
     }
+  }
+
+  if (
+    mode === "configure" &&
+    failures.length === 0 &&
+    plans.length > 0 &&
+    plans.every(([adapter]) => adapter.discovery !== "manual")
+  ) {
+    await context.globalState.update(LAST_MODEL_KEY, input.defaultModel);
   }
 
   const clipboard = plans

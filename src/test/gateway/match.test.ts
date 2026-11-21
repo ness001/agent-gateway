@@ -400,6 +400,30 @@ suite("Gateway model aliases", () => {
     );
   });
 
+  test("user aliases route to compatible remote models only", () => {
+    const remote = {
+      ...entry("box--remote-model"),
+      remote: "box",
+      upstreamModelId: "remote-model",
+      operations: ["anthropic.messages" as const],
+    };
+    const reg = [remote];
+    assert.strictEqual(
+      resolveModelAlias(reg, "claude-haiku-5.5", {
+        operation: "anthropic.messages",
+        userAliases: { "claude-haiku-5.5": remote.id },
+      })?.id,
+      remote.id,
+    );
+    assert.strictEqual(
+      resolveModelAlias(reg, "claude-haiku-5.5", {
+        operation: "openai.responses",
+        userAliases: { "claude-haiku-5.5": remote.id },
+      }),
+      undefined,
+    );
+  });
+
   test("user aliases override and empty values disable defaults", () => {
     const reg = [entry("gpt-5"), entry("gpt-6-astra"), gem("gemini-3-flash")];
     const userAliases = {

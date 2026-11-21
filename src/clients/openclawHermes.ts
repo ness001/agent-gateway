@@ -6,16 +6,19 @@ import {
   printParseErrorCode,
 } from "jsonc-parser";
 import * as path from "path";
-import { isMap, parseDocument } from "yaml";
+import { Scalar, isMap, parseDocument } from "yaml";
 
 import { validContextWindow } from "./contextWindow";
+import { gatewayV1Url } from "./defaults";
+import { toolModels } from "./defaults";
+import { CLIENT_DEFAULTS } from "./defaults";
+import { gatewayApiKey } from "./defaults";
 import {
   ClientAdapter,
   ClientConfigInput,
   ClientPlan,
   GATEWAY_PROVIDER_ID,
   GatewayModel,
-  PLACEHOLDER_API_KEY,
 } from "./types";
 
 function pathFor(platform: NodeJS.Platform) {
@@ -23,12 +26,20 @@ function pathFor(platform: NodeJS.Platform) {
 }
 
 function keyOf(input: ClientConfigInput): string {
-  return input.apiKey || PLACEHOLDER_API_KEY;
+  return gatewayApiKey(input);
 }
 
 /** Models usable by an agent: tool calling not explicitly unsupported. */
 function agentModels(models: GatewayModel[]): GatewayModel[] {
-  return models.filter((m) => m.supportsToolCalling !== false);
+  return toolModels(models);
+}
+
+function change(
+  filePath: string,
+  before: string | undefined,
+  after: string | undefined,
+): ClientPlan["changes"] {
+  return before === after ? [] : [{ path: filePath, before, after }];
 }
 
 // ---------------------------------------------------------------- OpenClaw
@@ -151,6 +162,7 @@ function stripMarker(text: string): string {
 
 function refuseOpenclaw(p: string, error: string): ClientPlan {
   return {
+    blocked: "OpenClaw configuration needs manual repair.",
     changes: [],
     summary: [
       `Cannot safely edit ${p}: it is not parseable as JSON with comments (${error}).`,
@@ -186,7 +198,7 @@ export const openclawAdapter: ClientAdapter = {
     const root = parsed.value;
     const summary: string[] = [];
     if (root.models?.mode === undefined) {
-      text = set(text, ["models", "mode"], "merge");
+      text = set(text, ["models", "mode"], CLIENT_DEFAULTS.openclaw.mode);
     }
     const models = agentModels(input.models).map((m) => {
       const entry: Record<string, unknown> = {
@@ -209,7 +221,7 @@ export const openclawAdapter: ClientAdapter = {
     text = set(text, ["models", "providers", GATEWAY_PROVIDER_ID], {
       baseUrl: input.gatewayUrl,
       apiKey: keyOf(input),
-      api: "anthropic-messages",
+      api: CLIENT_DEFAULTS.openclaw.api,
       models,
     });
     summary.push(
@@ -315,14 +327,71 @@ function hermesPath(home: string, platform: NodeJS.Platform): string {
   return pathFor(platform).join(hermesHome(home, platform), "config.yaml");
 }
 
+function hermesBackupPath(home: string, platform: NodeJS.Platform): string {
+  return pathFor(platform).join(
+    hermesHome(home, platform),
+    "agent-gateway-default.json",
+  );
+}
+
+function hermesPrevious(text: string | undefined): {
+  found: boolean;
+  provider: string | null;
+  model: string | null;
+  context: number | null;
+  scalarModel: string | undefined;
+  legacy: boolean;
+} {
+  if (text === undefined) {
+    return {
+      found: false,
+      provider: null,
+      model: null,
+      context: null,
+      scalarModel: undefined,
+      legacy: false,
+    };
+  }
+  const value: unknown = JSON.parse(text);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Hermes gateway model backup is invalid.");
+  }
+  const { provider, model, context, scalarModel, legacy } = value as Record<
+    string,
+    unknown
+  >;
+  if (
+    !(
+      (provider === null || typeof provider === "string") &&
+      (model === null || typeof model === "string") &&
+      (context === null || typeof context === "number") &&
+      (scalarModel === undefined || typeof scalarModel === "string") &&
+      (legacy === undefined || typeof legacy === "boolean")
+    )
+  ) {
+    throw new Error("Hermes gateway model backup is invalid.");
+  }
+  return {
+    found: true,
+    provider,
+    model,
+    context,
+    scalarModel,
+    legacy: legacy === true,
+  };
+}
+
 export const hermesAdapter: ClientAdapter = {
   id: "hermes",
   label: "Hermes Agent",
   discovery: "auto",
   caveat:
-    "Run Hermes with --provider agent-gateway, or pick agent-gateway in 'hermes model'.",
+    "Hermes uses the configured default in new sessions; command-line and session overrides may take precedence.",
   detectPaths: (home, platform) => [hermesHome(home, platform)],
-  configPaths: (home, platform) => [hermesPath(home, platform)],
+  configPaths: (home, platform) => [
+    hermesPath(home, platform),
+    hermesBackupPath(home, platform),
+  ],
   plan(input, files) {
     const p = hermesPath(input.home, input.platform);
     const before = files[p];
@@ -340,11 +409,11 @@ export const hermesAdapter: ClientAdapter = {
       };
     }
     const entry = {
-      api: `${input.gatewayUrl}/v1`,
+      api: gatewayV1Url(input),
       api_key: keyOf(input),
-      transport: "chat_completions",
+      transport: CLIENT_DEFAULTS.hermes.transport,
       default_model: input.defaultModel,
-      discover_models: true,
+      discover_models: CLIENT_DEFAULTS.hermes.discoverModels,
       models: Object.fromEntries(
         agentModels(input.models).flatMap((m) => {
           const context = validContextWindow(m.contextWindow);
@@ -354,6 +423,59 @@ export const hermesAdapter: ClientAdapter = {
         }),
       ),
     };
+    const backup = hermesBackupPath(input.home, input.platform);
+    const backupBefore = files[backup];
+    const previous = hermesPrevious(backupBefore);
+    const modelBlock = doc.getIn(["model"], true);
+    const scalarModel =
+      typeof doc.get("model") === "string"
+        ? (doc.get("model") as string)
+        : undefined;
+    if (
+      modelBlock !== undefined &&
+      modelBlock !== null &&
+      !isMap(modelBlock) &&
+      scalarModel === undefined
+    ) {
+      return {
+        changes: [],
+        summary: [
+          `Cannot safely edit ${p}: the global model setting is not a mapping or string.`,
+        ],
+        manualSteps: [
+          `Set model.provider to ${GATEWAY_PROVIDER_ID} and model.default to ${input.defaultModel} in ${p} by hand.`,
+        ],
+      };
+    }
+    const originalProvider = isMap(modelBlock)
+      ? doc.getIn(["model", "provider"])
+      : undefined;
+    const originalModel = isMap(modelBlock)
+      ? doc.getIn(["model", "default"])
+      : scalarModel;
+    const originalContext = isMap(modelBlock)
+      ? doc.getIn(["model", "context_length"])
+      : undefined;
+    const gatewaySelected =
+      originalProvider === GATEWAY_PROVIDER_ID ||
+      originalProvider === `custom:${GATEWAY_PROVIDER_ID}`;
+    if (
+      (originalProvider !== null &&
+        originalProvider !== undefined &&
+        typeof originalProvider !== "string") ||
+      (originalModel !== null &&
+        originalModel !== undefined &&
+        typeof originalModel !== "string") ||
+      (originalContext !== null &&
+        originalContext !== undefined &&
+        typeof originalContext !== "number")
+    ) {
+      return {
+        changes: [],
+        summary: [`Cannot safely save Hermes's previous model in ${p}.`],
+        manualSteps: [`Set model.provider and model.default in ${p} by hand.`],
+      };
+    }
     const existing = doc.getIn(["providers", GATEWAY_PROVIDER_ID]);
     if (isMap(existing)) {
       for (const [k, v] of Object.entries(entry)) {
@@ -362,21 +484,79 @@ export const hermesAdapter: ClientAdapter = {
     } else {
       doc.setIn(["providers", GATEWAY_PROVIDER_ID], entry);
     }
+    const selectedContext = validContextWindow(
+      input.models.find((m) => m.id === input.defaultModel)?.contextWindow,
+    );
+    if (scalarModel !== undefined) {
+      doc.set("model", {
+        provider: GATEWAY_PROVIDER_ID,
+        default: input.defaultModel,
+        ...(selectedContext === undefined
+          ? {}
+          : { context_length: selectedContext }),
+      });
+    } else {
+      doc.setIn(["model", "provider"], GATEWAY_PROVIDER_ID);
+      doc.setIn(["model", "default"], input.defaultModel);
+      if (selectedContext !== undefined) {
+        doc.setIn(["model", "context_length"], selectedContext);
+      } else if (originalContext !== undefined) {
+        doc.deleteIn(["model", "context_length"]);
+      }
+    }
     const after = doc.toString();
+    const backupAfter =
+      backupBefore === undefined || !gatewaySelected
+        ? JSON.stringify(
+            gatewaySelected
+              ? {
+                  provider: null,
+                  model: null,
+                  context: originalContext ?? null,
+                  legacy: true,
+                }
+              : {
+                  provider:
+                    scalarModel === undefined
+                      ? (originalProvider ?? null)
+                      : null,
+                  model:
+                    scalarModel === undefined ? (originalModel ?? null) : null,
+                  context: originalContext ?? null,
+                  ...(scalarModel === undefined ? {} : { scalarModel }),
+                },
+            null,
+            2,
+          ) + "\n"
+        : backupBefore;
     return {
-      changes: after === before ? [] : [{ path: p, before, after }],
-      summary: [
-        `Upsert providers.${GATEWAY_PROVIDER_ID} (${entry.api}, chat_completions) in ${p}; per-model context lengths come from gateway metadata. The global model block is left unchanged and may override these lengths.`,
-        `Run 'hermes model' and pick ${GATEWAY_PROVIDER_ID} to make it the active provider.`,
+      changes: [
+        ...change(backup, backupBefore, backupAfter),
+        ...change(p, before, after),
       ],
-      afterApply:
-        "Restart the Hermes session (or use /model) to load the new provider.",
+      summary: [
+        `Upsert providers.${GATEWAY_PROVIDER_ID} (${entry.api}, chat_completions) in ${p}; per-model context lengths come from gateway metadata.`,
+        `Set Hermes model.provider to ${GATEWAY_PROVIDER_ID} and model.default to ${input.defaultModel}.`,
+      ],
+      afterApply: "Restart Hermes to use the selected default in new sessions.",
     };
   },
   unplan(input, files) {
     const p = hermesPath(input.home, input.platform);
     const before = files[p];
     if (before === undefined) {
+      const backup = hermesBackupPath(input.home, input.platform);
+      if (files[backup] !== undefined) {
+        return {
+          changes: [],
+          summary: [
+            `Cannot restore Hermes's previous model because ${p} does not exist; kept ${backup}.`,
+          ],
+          manualSteps: [
+            `Restore or recreate ${p}, then remove the Agent Gateway configuration again.`,
+          ],
+        };
+      }
       return {
         changes: [],
         summary: [`${p} does not exist; nothing to remove.`],
@@ -385,26 +565,118 @@ export const hermesAdapter: ClientAdapter = {
     const doc = parseDocument(before);
     if (
       doc.errors.length > 0 ||
-      !doc.hasIn(["providers", GATEWAY_PROVIDER_ID])
+      (doc.contents !== null && !isMap(doc.contents))
     ) {
+      throw new Error(
+        `Cannot safely remove Hermes's provider: ${p} must be a YAML mapping.`,
+      );
+    }
+    const backup = hermesBackupPath(input.home, input.platform);
+    const backupBefore = files[backup];
+    const previous = hermesPrevious(backupBefore);
+    const modelBlock = doc.getIn(["model"], true);
+    const scalarModel =
+      typeof doc.get("model") === "string"
+        ? (doc.get("model") as string)
+        : undefined;
+    if (
+      modelBlock !== undefined &&
+      modelBlock !== null &&
+      !isMap(modelBlock) &&
+      scalarModel === undefined
+    ) {
+      throw new Error(
+        `Cannot safely remove Hermes's provider: model must be a mapping or string.`,
+      );
+    }
+    const providersBlock = doc.getIn(["providers"], true);
+    if (
+      providersBlock !== undefined &&
+      providersBlock !== null &&
+      !isMap(providersBlock)
+    ) {
+      throw new Error(
+        `Cannot safely remove Hermes's provider: providers must be a mapping.`,
+      );
+    }
+    const currentProvider = isMap(modelBlock)
+      ? doc.getIn(["model", "provider"])
+      : undefined;
+    const gatewaySelected =
+      currentProvider === GATEWAY_PROVIDER_ID ||
+      currentProvider === `custom:${GATEWAY_PROVIDER_ID}`;
+    const hasGatewayProvider = doc.hasIn(["providers", GATEWAY_PROVIDER_ID]);
+    if (!hasGatewayProvider && !gatewaySelected && !previous.found) {
       return {
         changes: [],
-        summary: [
-          `No providers.${GATEWAY_PROVIDER_ID} in ${p}; nothing to remove.`,
-        ],
+        summary: [`${p} has no gateway configuration; nothing to remove.`],
       };
     }
-    doc.deleteIn(["providers", GATEWAY_PROVIDER_ID]);
+    if (hasGatewayProvider) {
+      doc.deleteIn(["providers", GATEWAY_PROVIDER_ID]);
+    }
     const providers = doc.get("providers");
     if (isMap(providers) && providers.items.length === 0) {
       doc.delete("providers");
     }
+    if (previous.found && gatewaySelected) {
+      if (previous.scalarModel !== undefined) {
+        const currentModel = doc.getIn(["model"], true);
+        if (isMap(currentModel)) {
+          currentModel.delete("provider");
+          currentModel.delete("default");
+          currentModel.delete("context_length");
+        }
+        if (isMap(currentModel) && currentModel.items.length > 0) {
+          currentModel.set("default", previous.scalarModel);
+        } else {
+          const model = new Scalar(previous.scalarModel);
+          model.type = Scalar.QUOTE_DOUBLE;
+          doc.set("model", model);
+        }
+      } else {
+        if (previous.provider === null) {
+          doc.deleteIn(["model", "provider"]);
+        } else {
+          doc.setIn(["model", "provider"], previous.provider);
+        }
+        if (previous.model === null) {
+          doc.deleteIn(["model", "default"]);
+        } else {
+          doc.setIn(["model", "default"], previous.model);
+        }
+        if (previous.legacy) {
+          if (previous.context === null) {
+            doc.deleteIn(["model", "context_length"]);
+          } else {
+            doc.setIn(["model", "context_length"], previous.context);
+          }
+        } else if (previous.context === null) {
+          doc.deleteIn(["model", "context_length"]);
+        } else {
+          doc.setIn(["model", "context_length"], previous.context);
+        }
+        const modelBlock = doc.getIn(["model"], true);
+        if (isMap(modelBlock) && modelBlock.items.length === 0) {
+          doc.delete("model");
+        }
+      }
+    } else if (gatewaySelected) {
+      doc.deleteIn(["model", "provider"]);
+      doc.deleteIn(["model", "default"]);
+      const modelBlock = doc.getIn(["model"], true);
+      if (isMap(modelBlock) && modelBlock.items.length === 0) {
+        doc.delete("model");
+      }
+    }
     const after = doc.toString();
     return {
-      changes: [{ path: p, before, after }],
+      changes: [
+        ...change(p, before, after),
+        ...change(backup, backupBefore, undefined),
+      ],
       summary: [
-        `Remove providers.${GATEWAY_PROVIDER_ID} from ${p}.`,
-        `If Hermes was switched to ${GATEWAY_PROVIDER_ID}, run 'hermes model' to pick another provider.`,
+        `Remove providers.${GATEWAY_PROVIDER_ID} and restore the previous global model in ${p}.`,
       ],
     };
   },

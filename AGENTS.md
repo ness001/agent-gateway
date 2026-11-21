@@ -6,6 +6,21 @@ For release, publish, or version-tag requests, read
 Preserve unrelated changes and active user sessions; use an isolated worktree
 when another task is editing the same checkout.
 
+## Status and command consistency
+
+Keep sidebar status rows, the Status menu, and Command Palette actions aligned.
+An actionable status row must invoke the same registered command and handler as
+its matching menu action; do not duplicate configuration workflows in the view.
+Group controls by user task: Agent Setup, Connections, and Diagnostics. Before
+adding an entry, check whether it belongs in an existing group; do not add a
+new top-level action for every feature. Keep information separate from settings.
+Show gateway status, version, Copilot status, listener, and model count first,
+then Restart Gateway, then the task groups. All sidebar groups start expanded.
+Keep the Command Palette short: group commands open menus of the same registered
+actions used by the sidebar. Alignment does not require every action to appear
+at the palette's top level. Check grouping, order, and all entry points whenever
+an action changes. Preserve existing command IDs unless removal is requested.
+
 ## Completion requires local installation
 
 After each completed change to this repository, build and install the updated

@@ -57,7 +57,10 @@ configuration, manual steps and live-testing limitations.
 4. Run **Agent Gateway: Configure Coding Agents**, pick your agents and a
    default model, review the changes and confirm.
 
-Follow any remaining setup or restart instructions shown for your agents.
+The selected model becomes the startup default where an agent supports it.
+Antigravity and Cursor still need manual model selection. Project, session, or
+command-line settings can override a global default. Follow any remaining setup
+or restart instructions shown for your agents.
 The default local endpoint is `http://127.0.0.1:24444`. Open **Status** >
 **API URLs** to copy endpoints using your configured port, including token-count URLs.
 
@@ -80,21 +83,21 @@ and type **Agent Gateway**.
 
 ## Supported agents
 
-| Agent                    | How it is configured                                                                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code              | Configures the gateway and automatic model discovery.                                                                                           |
+| Agent                    | How it is configured                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code              | Configures the gateway and automatic model discovery.                                                                                                                       |
 | Codex                    | Adds an `agent-gateway` provider with automatic model discovery and makes it the default. On macOS, enables Codex's native system proxy resolver to honor proxy exceptions. |
-| Gemini CLI               | Configures the endpoint, key, model and authentication. Restart the CLI; shell or project overrides may take precedence. Not yet verified live. |
-| Antigravity CLI (`agy`)  | Configures Gemini mode and provides remaining setup steps. Requires a compatible model or mapping.                                              |
-| Oh My Pi (omp)           | Adds the gateway as a provider with automatic model discovery; pick a model with `/model`.                                                      |
-| Pi                       | Adds the gateway with its model list; run **Configure Coding Agents** again after models change.                                                |
-| Hermes Agent             | Adds an `agent-gateway` provider; run `hermes --provider agent-gateway` or pick it in `hermes model`.                                           |
-| OpenClaw                 | Adds the gateway with its model list. Checked against OpenClaw's documentation, not yet tested with a live install.                             |
-| Kilo Code                | Adds the gateway with its model list; pick `agent-gateway/<model>` with `/models`.                                                              |
-| Cline (CLI)              | Adds an OpenAI Compatible provider and makes it active; switch models with `cline -m <model>`. The Cline VS Code extension is set up by hand.   |
-| DeepSeek Harness (`dsh`) | Adds the gateway with its model list and makes your chosen model the default; removing it restores the previous default.                        |
-| Cursor                   | Shows manual steps. Cursor calls models from its own servers, so it needs a shared (dev tunnel) URL.                                            |
-| Any other agent          | Use the OpenAI, Anthropic or Gemini base URL; see [manual setup](docs/reference.md#manual-client-setup).                                        |
+| Gemini CLI               | Configures the endpoint, key, model and authentication. Restart the CLI; shell or project overrides may take precedence. Not yet verified live.                             |
+| Antigravity CLI (`agy`)  | Configures Gemini mode and provides remaining setup steps. Requires a compatible model or mapping.                                                                          |
+| Oh My Pi (omp)           | Adds the gateway with automatic model discovery and sets the global `modelRoles.default`; project and session roles may override it.                                        |
+| Pi                       | Adds the gateway with its model list and sets global `defaultProvider` and `defaultModel`; reconfigure after models change.                                                 |
+| Hermes Agent             | Adds an `agent-gateway` provider and selects it and the chosen model as global defaults.                                                                                    |
+| OpenClaw                 | Adds the gateway with its model list. Checked against OpenClaw's documentation, not yet tested with a live install.                                                         |
+| Kilo Code                | Adds the gateway with its model list and sets `model` to `agent-gateway/<model>` for new sessions.                                                                          |
+| Cline (CLI)              | Adds an OpenAI Compatible provider and makes it active; switch models with `cline -m <model>`. The Cline VS Code extension is set up by hand.                               |
+| DeepSeek Harness (`dsh`) | Adds the gateway with its model list and makes your chosen model the default; removing it restores the previous default.                                                    |
+| Cursor                   | Shows manual steps. Cursor calls models from its own servers, so it needs a shared (dev tunnel) URL.                                                                        |
+| Any other agent          | Use the OpenAI, Anthropic or Gemini base URL; see [manual setup](docs/reference.md#manual-client-setup).                                                                    |
 
 Each changed file is backed up next to itself as
 `<file>.agent-gateway-<timestamp>.bak`. **Configure Coding Agents** >
@@ -111,9 +114,9 @@ All commands are under **Agent Gateway** in the Command Palette.
 | Change Port                  | Moves the gateway to another port and offers to update your agents.              |
 | Set Fallback Model           | Manages model mappings, AI suggestions and an optional local or remote fallback. |
 | Configure Coding Agents      | Sets up, updates or removes the gateway in your agents.                          |
-| Web Search and Fetch         | Chooses the web search engine and its API key.                                   |
+| Set Web Search Engine        | Chooses the web search engine and its API key.                                   |
 | Share Gateway via Dev Tunnel | Shares your gateway with another machine and manages the gateway API key.        |
-| Manage Remote Upstreams      | Adds, tests or removes another machine's gateway.                                |
+| Manage Remote Gateways       | Adds, tests or removes another machine's gateway.                                |
 
 ## Share models between machines
 
@@ -129,10 +132,12 @@ connection-check failure. You can start, manage or stop sharing from **Status**.
 
 Run **Share Gateway via Dev Tunnel** again and choose **Stop sharing** to stop
 hosting. Hosting also stops when the extension shuts down. Installation and
-sign-in may still open a terminal for interactive steps.
+sign-in may still open a terminal for interactive steps. If `devtunnel` is
+installed outside PATH or WinGet Links, set `agentGateway.devTunnel.cliPath` to
+the full executable path in VS Code settings.
 
-On the other machine, run **Manage Remote Upstreams** > **Add remote
-upstream**, paste the URL and enter the key. Its models appear as
+On the other machine, run **Manage Remote Gateways** > **Add remote
+gateway**, paste the URL and enter the key. Its models appear as
 `<name>--<model>`.
 
 > Anyone with the tunnel URL and key can use your Copilot models. Always set a
@@ -140,19 +145,19 @@ upstream**, paste the URL and enter the key. Its models appear as
 
 ## Web search and URL fetch
 
-Web search is off until you turn it on. Run **Web Search and Fetch**, pick an
+Web search is off until you turn it on. Run **Set Web Search Engine**, pick an
 engine, and enter its API key, or leave the key empty to use the engine's
 free anonymous endpoint where there is one.
 
-| Engine    | Without a key                   |
-| --------- | ------------------------------- |
-| Exa       | Search and fetch (rate-limited) |
-| Firecrawl | Search and fetch (rate-limited) |
-| Jina AI   | Fetch only                      |
-| Tavily    | Needs a key                     |
-| You.com   | Needs a key                     |
-| Brave Search | Needs a key (search only)     |
-| Kagi      | Needs a key                     |
+| Engine       | Without a key                   |
+| ------------ | ------------------------------- |
+| Exa          | Search and fetch (rate-limited) |
+| Firecrawl    | Search and fetch (rate-limited) |
+| Jina AI      | Fetch only                      |
+| Tavily       | Needs a key                     |
+| You.com      | Needs a key                     |
+| Brave Search | Needs a key (search only)       |
+| Kagi         | Needs a key                     |
 
 Keys are stored in VS Code secret storage, never in `settings.json`. For Codex,
 the command also offers to turn on its live search (`web_search = "live"`).
@@ -160,17 +165,17 @@ Search queries, results and page text are never logged.
 
 ## Settings
 
-| Setting                                        | Default             | Description                                                         |
-| ---------------------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| `agentGateway.enabled`                         | `true`              | Run the gateway.                                                    |
-| `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                |
-| `agentGateway.logLevel`                        | `info`              | `error`, `warn`, `info` or `debug`.                                 |
-| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Upstreams**).  |
-| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Web Search and Fetch**).            |
-| `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                   |
-| `agentGateway.webSearch.model`                 | `""`                | Model for Gemini CLI search requests when its model is unknown.     |
-| `agentGateway.modelMappings`                   | Two empty mappings¹ | Map requested names to local models through **Set Fallback Model**. |
-| `agentGateway.fallbackModel`                   | `""`                | Model for unknown model names (managed by **Set Fallback Model**).  |
+| Setting                                        | Default             | Description                                                                   |
+| ---------------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `agentGateway.enabled`                         | `true`              | Run the gateway.                                                              |
+| `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                          |
+| `agentGateway.logLevel`                        | `info`              | `error`, `warning`, `info` or `debug`.                                           |
+| `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).             |
+| `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).                     |
+| `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                             |
+| `agentGateway.webSearch.model`                 | `""`                | Model for Gemini CLI search requests when its model is unknown.               |
+| `agentGateway.modelMappings`                   | Two empty mappings¹ | Map requested names to local or remote models through **Set Fallback Model**. |
+| `agentGateway.fallbackModel`                   | `""`                | Model for unknown model names (managed by **Set Fallback Model**).            |
 
 ¹ The default mapping keys are `claude-haiku-5.5` and `claude-sonnet-5`, both
 empty. They do not force a replacement model.
@@ -202,7 +207,7 @@ to save. Existing mappings stay unchanged unless you select replacements.
 Canceling saves nothing; saved mappings apply without restarting the gateway.
 
 The advisor receives model names and metadata—not files or conversations—and
-uses Copilot quota. Suggestions target compatible local models, not remote models;
+uses Copilot quota. Suggestions can target compatible local or remote models;
 they are recommendations, not benchmark rankings.
 
 See [mapping details](docs/reference.md#unknown-models-and-aliases) for defaults,
@@ -218,7 +223,7 @@ Code have no such servers, so the gateway runs what it can itself:
 
 | Server tool                                                                                             | Through the gateway                                                                                       |
 | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Web search (Anthropic `web_search`, OpenAI `web_search`, Gemini `googleSearch`)                         | Run by the gateway through the engine you pick in **Web Search and Fetch**. Off until you pick one.       |
+| Web search (Anthropic `web_search`, OpenAI `web_search`, Gemini `googleSearch`)                         | Run by the gateway through the engine you pick in **Set Web Search Engine**. Off until you pick one.      |
 | Gemini URL context (`urlContext`, Gemini CLI's `web_fetch`)                                             | Run by the gateway, unless the same request also has the agent's own tools.                               |
 | Anthropic `web_fetch`                                                                                   | Run by the gateway with the same engine. Only pages whose URL is already in the conversation are fetched. |
 | Code execution (Anthropic `code_execution`, OpenAI code interpreter, Gemini `codeExecution`)            | Not supported. Left out (Anthropic: the request fails).                                                   |

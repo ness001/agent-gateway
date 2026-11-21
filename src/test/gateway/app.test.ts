@@ -113,9 +113,11 @@ suite("Gateway app", () => {
     assert.strictEqual(alias.context_window, target.contextWindow);
     assert.ok(
       !listed.data.some((e: { id: string }) =>
-        ["disabled", "missing", "remote"].includes(e.id),
+        ["disabled", "missing"].includes(e.id),
       ),
     );
+    const remote = listed.data.find((e: { id: string }) => e.id === "remote");
+    assert.strictEqual(remote.display_name, "[box] gpt-5-remote");
     assert.strictEqual(
       listed.data.filter((e: { id: string }) => e.id === "gpt-5").length,
       1,
@@ -136,8 +138,11 @@ suite("Gateway app", () => {
         { name: "test_tool", input_schema: { type: "object", properties: {} } },
       ],
     };
-    const response = await app.fetch(post("/v1/messages", body));
+    const response = await app.fetch(
+      post("/v1/messages", body, { origin: "https://example.test" }),
+    );
     assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get("access-control-allow-origin"), "*");
     assert.strictEqual(
       response.headers.get("x-agent-gateway-model"),
       "gpt-6-astra",
@@ -822,6 +827,31 @@ suite("Gateway app", () => {
     );
   });
 
+  test("mapped Claude names forward to remote models with the upstream ID", async () => {
+    const h = harness();
+    h.deps.getModelAliases = () => ({
+      "claude-haiku-5.5": "box--gpt-5-remote",
+      "claude-sonnet-5": "box--gpt-5-remote",
+    });
+    const app = createGatewayApp(h.deps);
+    for (const source of ["claude-haiku-5.5", "claude-sonnet-5"]) {
+      const response = await app.fetch(
+        post("/v1/messages", { model: source, messages: [] }),
+      );
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(
+        response.headers.get("x-agent-gateway-model-fallback"),
+        `${source} -> box--gpt-5-remote; reason=model alias`,
+      );
+    }
+    assert.strictEqual(h.local.length, 0);
+    assert.strictEqual(h.remote.length, 2);
+    for (const req of h.remote) {
+      assert.strictEqual(req.url, "http://remote.test/v1/messages");
+      assert.strictEqual(JSON.parse(req.body!).model, "gpt-5-remote");
+    }
+  });
+
   test("the exact Gemini CLI web-fetch request resolves through the alias", async () => {
     const h = harness();
     h.deps.getFallbackModel = () => "gpt-6-astra";
@@ -1088,7 +1118,7 @@ suite("Gateway app", () => {
       assert.ok(
         h.logs.some((l) =>
           l.includes(
-            `remote "box" rejected the gateway credentials (HTTP ${status}); set the key with 'Agent Gateway: Manage Remote Upstreams'`,
+            `remote "box" rejected the gateway credentials (HTTP ${status}); set the key with 'Agent Gateway: Manage Remote Gateways'`,
           ),
         ),
       );

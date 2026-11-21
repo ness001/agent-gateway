@@ -90,25 +90,28 @@ suite("configured context windows", () => {
   });
   test("Kilo writes context independently of missing output metadata", () => {
     const plan = kiloAdapter.plan(input, {});
-    const value = parse(plan.changes[0].after!).provider["agent-gateway"]
-      .models["gpt-test"];
+    const file = "/home/test/.config/kilo/kilo.jsonc";
+    const value = parse(plan.changes.find((c) => c.path === file)!.after!)
+      .provider["agent-gateway"].models["gpt-test"];
     assert.deepStrictEqual(value.limit, { context: 900000 });
   });
   test("Hermes writes per-model capacities and refreshes removed or unknown metadata", () => {
     const plan = hermesAdapter.plan(input, {});
-    const file = plan.changes[0].path;
-    const text = plan.changes[0].after!;
+    const file = "/home/test/.hermes/config.yaml";
+    const backup = "/home/test/.hermes/agent-gateway-default.json";
+    const text = plan.changes.find((c) => c.path === file)!.after!;
+    const backupText = plan.changes.find((c) => c.path === backup)!.after!;
     assert.deepStrictEqual(parseYaml(text).providers["agent-gateway"].models, {
       "gpt-test": { context_length: 900000 },
     });
     assert.strictEqual(
-      hermesAdapter.plan(input, { [file]: text }).changes.length,
+      hermesAdapter.plan(input, { [file]: text, [backup]: backupText }).changes
+        .length,
       0,
     );
-    const changed = hermesAdapter.plan(
-      { ...input, models: [] },
-      { [file]: text },
-    ).changes[0].after!;
+    const changed = hermesAdapter
+      .plan({ ...input, models: [] }, { [file]: text, [backup]: backupText })
+      .changes.find((c) => c.path === file)!.after!;
     assert.deepStrictEqual(
       parseYaml(changed).providers["agent-gateway"].models,
       {},

@@ -71,6 +71,44 @@ suite("Gateway lifecycle", () => {
     }
   });
 
+  for (const apiKey of [undefined, "test-shared-key"]) {
+    test(`another window shares status and takes over (${apiKey ? "authenticated" : "no key"})`, async () => {
+      const port = await freePort();
+      const config = { ...DEFAULT_CONFIG, port };
+      const context = {
+        ...fakeContext,
+        secrets: { get: async () => apiKey },
+      } as unknown as vscode.ExtensionContext;
+      const owner = new Gateway(context, { readConfig: () => config });
+      const follower = new Gateway(context, {
+        readConfig: () => config,
+        portRetryMs: 50,
+      });
+      const conflicts: string[] = [];
+      follower.onDidEnterPortConflict((c) => conflicts.push(c.occupant));
+      try {
+        await owner.start();
+        await follower.start();
+        assert.strictEqual(follower.state, "Running in another window");
+        assert.strictEqual(follower.address, owner.address);
+        assert.strictEqual(follower.health().listener.active, true);
+        assert.strictEqual(follower.health().lastStartupError, null);
+        assert.deepStrictEqual(conflicts, []);
+        await follower.restart();
+        assert.strictEqual(owner.port, port);
+        assert.strictEqual(follower.state, "Running in another window");
+        await owner.stop();
+        await waitFor(() => follower.port === port);
+        assert.notStrictEqual(follower.state, "Running in another window");
+      } finally {
+        await follower.stop();
+        await owner.stop();
+        follower.dispose();
+        owner.dispose();
+      }
+    });
+  }
+
   test("enabled=false stops the listener and frees the port", async () => {
     const port = await freePort();
     const config: GatewayConfiguration = { ...DEFAULT_CONFIG, port };

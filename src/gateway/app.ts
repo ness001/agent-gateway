@@ -270,7 +270,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
   const app = new Hono();
   let tunnelWarningShown = false;
 
-  app.use("*", cors());
+  app.options("*", cors());
 
   app.use("*", async (c, next) => {
     const id = requestIdFrom(c.req.raw.headers);
@@ -283,15 +283,19 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
     };
     c.set("requestId" as never, id as never);
     await runWithRequestContext(context, () => next());
+    // Apply CORS after routing so Hono does not pre-create a response before
+    // dispatch returns its model and fallback headers.
     // Reassigning c.res makes Hono rebuild the response; only do it when the
     // headers are immutable (a passed-through fetch Response).
     try {
       c.res.headers.set(REQUEST_ID_HEADER, id);
       c.res.headers.set(ANTHROPIC_REQUEST_ID_HEADER, id);
+      c.res.headers.set("Access-Control-Allow-Origin", "*");
     } catch {
       c.res = withHeaders(c.res, {
         [REQUEST_ID_HEADER]: id,
         [ANTHROPIC_REQUEST_ID_HEADER]: id,
+        "Access-Control-Allow-Origin": "*",
       });
     }
     const selected = c.get("selectedModel" as never) as string | undefined;
@@ -731,7 +735,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
         });
         if (response.status === 401 || response.status === 403) {
           deps.logger.warn(
-            `[${reqId}] remote ${logId(remote.name)} rejected the gateway credentials (HTTP ${response.status}); set the key with 'Agent Gateway: Manage Remote Upstreams'`,
+            `[${reqId}] remote ${logId(remote.name)} rejected the gateway credentials (HTTP ${response.status}); set the key with 'Agent Gateway: Manage Remote Gateways'`,
           );
         }
         return response;
