@@ -252,6 +252,7 @@ function send(path: string, body: Buffer, stream: boolean) {
       const chunks: number[] = [];
       let seen = 0;
       let tail = "";
+      let bodyBuf = ""; // accumulates non-streamed response body
       const req = http.request(
         {
           host: "127.0.0.1",
@@ -264,19 +265,110 @@ function send(path: string, body: Buffer, stream: boolean) {
         (res) => {
           res.on("data", (buf: Buffer) => {
             const now = performance.now();
-            const text = tail + buf.toString("latin1");
-            for (const m of text.matchAll(/k(\d+)z/g)) {
-              const i = Number(m[1]);
-              if (i >= seen) {
-                if (stream) {
-                  chunks.push(now - t.yields[i]);
+            if (!stream) {
+              // Non-streamed: accumulate entire body, parse on "end".
+              bodyBuf += buf.toString("latin1");
+              return;
+            }
+            // Streamed: parse SSE lines, extract only model text_delta.
+            // Scanning raw bytes matches envelope JSON too, producing false
+            // positives (93 vs 20 on Anthropic large).
+            const raw = tail + buf.toString("latin1");
+            const lines = raw.split("\n");
+            tail = lines.pop() ?? "";
+            for (const line of lines) {
+              const dataLine = line.startsWith("data: ") ? line.slice(6).trim() : null;
+              if (!dataLine || dataLine === "[DONE]") continue;
+              let text: string | undefined;
+              try {
+                const ev = JSON.parse(dataLine) as Record<string, unknown>;
+                // Anthropic content_block_delta / text_delta
+                if (
+                  ev["type"] === "content_block_delta" &&
+                  typeof ev["delta"] === "object" &&
+                  ev["delta"] !== null &&
+                  (ev["delta"] as Record<string, unknown>)["type"] === "text_delta"
+                ) {
+                  text = String((ev["delta"] as Record<string, unknown>)["text"] ?? "");
                 }
-                seen = i + 1;
+                // OpenAI / chat SSE delta
+                if (!text && typeof ev["choices"] !== "undefined") {
+                  const choice = (ev["choices"] as Array<Record<string, unknown>>)[0];
+                  if (choice) {
+                    const delta = choice["delta"] as Record<string, unknown> | undefined;
+                    text = String(delta?.["content"] ?? "");
+                  }
+                }
+                // Responses API output_text.delta
+                if (!text && ev["type"] === "response.output_text.delta") {
+                  text = String(ev["delta"] ?? "");
+                }
+                // Gemini SSE
+                if (!text && typeof ev["candidates"] !== "undefined") {
+                  const cands = ev["candidates"] as Array<Record<string, unknown>>;
+                  const parts = (cands[0]?.["content"] as Record<string, unknown>)?.["parts"] as
+                    | Array<Record<string, unknown>>
+                    | undefined;
+                  text = String(parts?.[0]?.["text"] ?? "");
+                }
+              } catch {
+                // not JSON
+              }
+              if (!text) continue;
+              for (const m of text.matchAll(/k(\d+)z/g)) {
+                const i = Number(m[1]);
+                if (i >= seen) {
+                  chunks.push(now - t.yields[i]);
+                  seen = i + 1;
+                }
               }
             }
-            tail = text.slice(-8);
           });
           res.on("end", () => {
+            // Non-streamed: parse the accumulated body to count markers.
+            if (!stream && bodyBuf) {
+              try {
+                const ev = JSON.parse(bodyBuf) as Record<string, unknown>;
+                // Anthropic non-stream
+                const content = ev["content"] as Array<Record<string, unknown>> | undefined;
+                let text: string | undefined;
+                if (Array.isArray(content) && content[0]?.["type"] === "text") {
+                  text = String(content[0]["text"] ?? "");
+                }
+                // OpenAI non-stream
+                if (!text && typeof ev["choices"] !== "undefined") {
+                  const choice = (ev["choices"] as Array<Record<string, unknown>>)[0];
+                  text = String(
+                    (choice?.["message"] as Record<string, unknown> | undefined)?.["content"] ?? "",
+                  );
+                }
+                // Responses API non-stream
+                if (!text && typeof ev["output"] !== "undefined") {
+                  const output = ev["output"] as Array<Record<string, unknown>>;
+                  const first = output?.[0];
+                  const parts = first?.["content"] as Array<Record<string, unknown>> | undefined;
+                  text = String(parts?.[0]?.["text"] ?? "");
+                }
+                // Gemini non-stream
+                if (!text && typeof ev["candidates"] !== "undefined") {
+                  const cands = ev["candidates"] as Array<Record<string, unknown>>;
+                  const parts = (cands[0]?.["content"] as Record<string, unknown>)?.["parts"] as
+                    | Array<Record<string, unknown>>
+                    | undefined;
+                  text = String(parts?.[0]?.["text"] ?? "");
+                }
+                if (text) {
+                  for (const m of text.matchAll(/k(\d+)z/g)) {
+                    const i = Number(m[1]);
+                    if (i >= seen) {
+                      seen = i + 1;
+                    }
+                  }
+                }
+              } catch {
+                // not JSON
+              }
+            }
             timings.delete(rid);
             if (res.statusCode !== 200 || seen !== CHUNKS || !t.modelCalled) {
               reject(
