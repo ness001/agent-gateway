@@ -39,6 +39,12 @@ export interface ModelInfo {
   defaultReasoningLevel: string;
   supportedReasoningLevels: ReasoningLevel[];
   operations: ProtocolOperation[];
+  /**
+   * APIs the owning remote serves itself. Set only for remotes discovered
+   * through `GET /v1/models`; other operations are translated by this
+   * gateway to the remote's Chat Completions API.
+   */
+  nativeOperations?: ProtocolOperation[];
 }
 
 /** One advertised catalogue entry (native or alias). */

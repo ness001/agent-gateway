@@ -12,6 +12,7 @@ import {
 import { logger } from "../utils/logger";
 import { createGatewayApp } from "./app";
 import { buildRegistry, summarizeModels } from "./catalog";
+import { createChatCompletionsModel } from "./chatCompletionsModel";
 import { BUILD_TIME, IS_DEV_VARIANT } from "./devVariant";
 import { dedupeModels, toModelInfo, validateModelInfo } from "./discovery";
 import { ErrorJournal } from "./errorJournal";
@@ -131,14 +132,23 @@ export class Gateway implements vscode.Disposable {
         return;
       }
       const port = IS_DEV_VARIANT ? DEV_PORT : config.port;
+      const routeOptions = {
+        maxSearchesPerRequest: config.webSearch.maxSearchesPerRequest,
+        getHostedEngines: () => this.createHostedEngines(),
+        getWebSearchModel: () => this.readConfig().webSearch.model,
+      };
       const app = createGatewayApp({
         getRegistry: () => this.registry,
         getLocalModels: () => this.localInfos,
         handleLocal: createLocalHandler({
+          ...routeOptions,
           getLocalModel: (id) => this.localModels.get(id),
-          maxSearchesPerRequest: config.webSearch.maxSearchesPerRequest,
-          getHostedEngines: () => this.createHostedEngines(),
-          getWebSearchModel: () => this.readConfig().webSearch.model,
+        }),
+        handleTranslated: createLocalHandler({
+          ...routeOptions,
+          // Local models stay reachable for hosted web search side requests.
+          getLocalModel: (id) =>
+            this.translatedModel(id) ?? this.localModels.get(id),
         }),
         getRemote: (name) => this.remotes.find((r) => r.name === name),
         getRemoteStates: () => this.remoteStates,
@@ -409,6 +419,26 @@ export class Gateway implements vscode.Disposable {
       }
     }
     this.rebuildRegistry();
+  }
+
+  /** A Chat-Completions-only remote model, wrapped for protocol translation. */
+  private translatedModel(id: string): vscode.LanguageModelChat | undefined {
+    const entry = this.registry.find(
+      (e) => e.id === id && e.remote !== undefined && e.nativeOperations,
+    );
+    const remote = entry && this.remotes.find((r) => r.name === entry.remote);
+    if (!entry || !remote) {
+      return undefined;
+    }
+    return createChatCompletionsModel({
+      id,
+      remote,
+      upstreamModelId: entry.upstreamModelId,
+      info: entry,
+      getApiKey: async () =>
+        (await this.context.secrets.get(remoteApiKeySecretKey(remote.name))) ||
+        undefined,
+    }) as unknown as vscode.LanguageModelChat;
   }
 
   private rebuildRegistry(): void {

@@ -1,7 +1,11 @@
+import { dedupeModels, fromOpenAIModel } from "./discovery";
 import type { ModelInfo, RemoteState, RemoteUpstreamConfig } from "./types";
 import { GATEWAY_CATALOG_VERSION } from "./types";
 
 const CATALOG_PATH = "/v1/gateway/catalog";
+/** Standard OpenAI-compatible model list, used when the remote is not a gateway. */
+const MODELS_PATH = "/v1/models";
+const NOT_SUPPORTED = "not an Agent Gateway or OpenAI-compatible server";
 
 // Reasons are built only from fixed text and status codes, never from
 // response bodies or fetch error messages.
@@ -9,6 +13,8 @@ class DiscoveryError extends Error {
   constructor(
     readonly reason: string,
     readonly transient: boolean,
+    /** The remote answered but is not an Agent Gateway; try `/v1/models`. */
+    readonly notGateway = false,
   ) {
     super(reason);
   }
@@ -32,7 +38,7 @@ export async function discoverRemote(
   let lastReason = "Unexpected discovery failure.";
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const models = await fetchCatalog(remote, opts);
+      const models = await fetchModels(remote, opts);
       return {
         state: {
           name: remote.name,
@@ -65,10 +71,26 @@ export async function discoverRemote(
   };
 }
 
-async function fetchCatalog(
+async function fetchModels(
   remote: RemoteUpstreamConfig,
   opts: DiscoverRemoteOptions,
 ): Promise<ModelInfo[]> {
+  try {
+    const body = await fetchJson(remote, CATALOG_PATH, opts);
+    return parseCatalog(body, opts.validate);
+  } catch (error) {
+    if (!(error instanceof DiscoveryError) || !error.notGateway) {
+      throw error;
+    }
+  }
+  return parseModelList(await fetchJson(remote, MODELS_PATH, opts));
+}
+
+async function fetchJson(
+  remote: RemoteUpstreamConfig,
+  path: string,
+  opts: DiscoverRemoteOptions,
+): Promise<unknown> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const timeoutMs = opts.attemptTimeoutMs ?? 10_000;
   const headers: Record<string, string> = { accept: "application/json" };
@@ -84,7 +106,7 @@ async function fetchCatalog(
   try {
     let response: Response;
     try {
-      response = await fetchImpl(`${remote.url}${CATALOG_PATH}`, {
+      response = await fetchImpl(`${remote.url}${path}`, {
         headers,
         signal: controller.signal,
         redirect: "manual",
@@ -98,23 +120,23 @@ async function fetchCatalog(
       await response.body?.cancel().catch(() => undefined);
       const status = response.status;
       throw new DiscoveryError(
-        `GET ${CATALOG_PATH} returned HTTP ${status}: ${statusHint(status)}`,
+        `GET ${path} returned HTTP ${status}: ${statusHint(status)}`,
         status === 408 || status === 429 || (status >= 500 && status <= 599),
+        status === 404,
       );
     }
-    let body: unknown;
     try {
-      body = await response.json();
+      return await response.json();
     } catch {
       if (timedOut) {
         throw timeoutError(timeoutMs);
       }
       throw new DiscoveryError(
-        `GET ${CATALOG_PATH} returned invalid JSON: not an Agent Gateway.`,
+        `GET ${path} returned invalid JSON: ${NOT_SUPPORTED}.`,
         false,
+        true,
       );
     }
-    return parseCatalog(body, opts.validate);
   } finally {
     clearTimeout(timer);
   }
@@ -128,6 +150,7 @@ function parseCatalog(
     throw new DiscoveryError(
       `GET ${CATALOG_PATH} returned an unexpected document: not an Agent Gateway.`,
       false,
+      true,
     );
   }
   const { version, models } = body as Record<string, unknown>;
@@ -135,6 +158,7 @@ function parseCatalog(
     throw new DiscoveryError(
       `GET ${CATALOG_PATH} returned no catalogue version: not an Agent Gateway.`,
       false,
+      true,
     );
   }
   if (version !== GATEWAY_CATALOG_VERSION) {
@@ -159,6 +183,34 @@ function parseCatalog(
   }
 }
 
+function parseModelList(body: unknown): ModelInfo[] {
+  const data =
+    typeof body === "object" && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>).data
+      : undefined;
+  if (!Array.isArray(data)) {
+    throw new DiscoveryError(
+      `GET ${MODELS_PATH} returned an unexpected document: ${NOT_SUPPORTED}.`,
+      false,
+    );
+  }
+  const models: ModelInfo[] = [];
+  for (const entry of data) {
+    try {
+      models.push(fromOpenAIModel(entry));
+    } catch {
+      // Skip unusable entries; third-party lists are not strictly validated.
+    }
+  }
+  if (data.length > 0 && models.length === 0) {
+    throw new DiscoveryError(
+      `GET ${MODELS_PATH} returned no valid model entries.`,
+      false,
+    );
+  }
+  return dedupeModels(models);
+}
+
 function statusHint(status: number): string {
   if (status === 401) {
     return "the remote gateway requires an API key; set one for this remote.";
@@ -167,7 +219,7 @@ function statusHint(status: number): string {
     return "the API key for this remote is invalid.";
   }
   if (status === 404) {
-    return "tunnel missing or not an Agent Gateway";
+    return `tunnel missing or ${NOT_SUPPORTED}`;
   }
   if (status === 502 || status === 503 || status === 504) {
     return "the tunnel host or remote gateway is not serving; check devtunnel host and VS Code on that machine.";

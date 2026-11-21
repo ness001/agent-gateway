@@ -17,6 +17,7 @@ const cloneInfo = (m: ModelInfo): ModelInfo => ({
   inputModalities: [...m.inputModalities],
   supportedReasoningLevels: m.supportedReasoningLevels.map((l) => ({ ...l })),
   operations: [...m.operations],
+  ...(m.nativeOperations ? { nativeOperations: [...m.nativeOperations] } : {}),
 });
 
 /** Local IDs first, then remotes in order; earlier wins; then one alias per native entry. */
