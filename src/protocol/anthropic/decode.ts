@@ -649,5 +649,8 @@ export function decodeMessagesRequest(
   if (isRec(body.thinking) && typeof body.thinking.type === "string") {
     req.echo.thinking = body.thinking.type;
   }
+  if (typeof body.prompt_cache_key === "string" && body.prompt_cache_key) {
+    req.cacheKey = body.prompt_cache_key;
+  }
   return req;
 }

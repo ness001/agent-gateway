@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { cors } from "hono/cors";
 
 import {
   logRequestSettings,
@@ -269,6 +270,8 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
   const app = new Hono();
   let tunnelWarningShown = false;
 
+  app.options("*", cors());
+
   app.use("*", async (c, next) => {
     const id = requestIdFrom(c.req.raw.headers);
     const started = Date.now();
@@ -280,15 +283,19 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
     };
     c.set("requestId" as never, id as never);
     await runWithRequestContext(context, () => next());
+    // Apply CORS after routing so Hono does not pre-create a response before
+    // dispatch returns its model and fallback headers.
     // Reassigning c.res makes Hono rebuild the response; only do it when the
     // headers are immutable (a passed-through fetch Response).
     try {
       c.res.headers.set(REQUEST_ID_HEADER, id);
       c.res.headers.set(ANTHROPIC_REQUEST_ID_HEADER, id);
+      c.res.headers.set("Access-Control-Allow-Origin", "*");
     } catch {
       c.res = withHeaders(c.res, {
         [REQUEST_ID_HEADER]: id,
         [ANTHROPIC_REQUEST_ID_HEADER]: id,
+        "Access-Control-Allow-Origin": "*",
       });
     }
     const selected = c.get("selectedModel" as never) as string | undefined;
@@ -359,11 +366,27 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
       }
       if (path === "/v1/models") {
         const reg = deps.getRegistry();
-        return c.json(
-          c.req.query("client_version")
-            ? createCodexModelsResponse(reg)
-            : createModelsResponse(reg),
-        );
+        if (c.req.query("client_version")) {
+          return c.json(createCodexModelsResponse(reg));
+        }
+        // Advertise explicit mappings with the target's real metadata. Clients
+        // that validate configured IDs against discovery need these routes too.
+        const advertised = [...reg];
+        for (const [id, target] of Object.entries(
+          safeRead(deps.getModelAliases) ?? {},
+        )) {
+          if (reg.some((entry) => entry.id === id)) {
+            continue;
+          }
+          const entry = resolveModelAlias(reg, id, {
+            userAliases: { [id]: target },
+            operation: "anthropic.messages",
+          });
+          if (entry) {
+            advertised.push({ ...entry, id, isAlias: true });
+          }
+        }
+        return c.json(createModelsResponse(advertised));
       }
       if (path === "/health") {
         return c.json(deps.getHealth() as object);
