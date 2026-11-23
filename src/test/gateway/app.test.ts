@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 
 import { type GatewayAppDeps, createGatewayApp } from "../../gateway/app";
 import { buildRegistry } from "../../gateway/catalog";
+import { discoverRemote } from "../../gateway/remote";
 import { ALL_OPERATIONS, type ModelInfo } from "../../gateway/types";
 
 const model = (id: string): ModelInfo => ({
@@ -83,6 +84,9 @@ suite("Gateway app", () => {
     const app = createGatewayApp(harness().deps);
     const plain = await (await app.fetch(get("/v1/models"))).json();
     assert.strictEqual(plain.has_more, false);
+    assert.strictEqual(plain.data[0].object, "model");
+    assert.strictEqual(typeof plain.data[0].created, "number");
+    assert.strictEqual(plain.data[0].agent_gateway, undefined);
     const ids = plain.data.map((m: { id: string }) => m.id);
     assert.ok(ids.includes("gpt-5"));
     assert.ok(ids.includes("box--gpt-5-remote"));
@@ -142,7 +146,10 @@ suite("Gateway app", () => {
       post("/v1/messages", body, { origin: "https://example.test" }),
     );
     assert.strictEqual(response.status, 200);
-    assert.strictEqual(response.headers.get("access-control-allow-origin"), "*");
+    assert.strictEqual(
+      response.headers.get("access-control-allow-origin"),
+      "*",
+    );
     assert.strictEqual(
       response.headers.get("x-agent-gateway-model"),
       "gpt-6-astra",
@@ -160,19 +167,45 @@ suite("Gateway app", () => {
     assert.strictEqual(target.isAlias, false);
   });
 
-  test("catalog lists local models only", async () => {
+  test("a peer discovers only local models with their native operations", async () => {
+    const app = createGatewayApp(harness("shared-key").deps);
+    const remote = await discoverRemote(
+      { name: "box", url: "http://remote.test" },
+      {
+        attempts: 1,
+        apiKey: "shared-key",
+        fetchImpl: async (url, init) => {
+          assert.strictEqual(url, "http://remote.test/v1/models");
+          const response = await app.fetch(new Request(url, init));
+          assert.match(
+            response.headers.get("vary") ?? "",
+            /x-agent-gateway-discovery/i,
+          );
+          return response;
+        },
+      },
+    );
+    assert.strictEqual(remote.state.status, "ready");
+    assert.deepStrictEqual(remote.models.map((m) => m.id).sort(), [
+      "claude-sonnet-4.5",
+      "gpt-5",
+      "gpt-6-astra",
+    ]);
+    assert.deepStrictEqual(remote.models[0].operations, ALL_OPERATIONS);
+    assert.strictEqual(remote.models[0].nativeOperations, undefined);
+  });
+
+  test("the former discovery route returns 404", async () => {
     const app = createGatewayApp(harness().deps);
-    const body = await (await app.fetch(get("/v1/gateway/catalog"))).json();
-    assert.strictEqual(body.version, 1);
-    assert.deepStrictEqual(
-      body.models.map((m: { id: string }) => m.id).sort(),
-      ["claude-sonnet-4.5", "gpt-5", "gpt-6-astra"],
+    assert.strictEqual(
+      (await app.fetch(get("/v1/gateway/catalog"))).status,
+      404,
     );
   });
 
   test("apiKey is enforced on every route", async () => {
     const app = createGatewayApp(harness("s3cret").deps);
-    for (const path of ["/health", "/v1/models", "/v1/gateway/catalog"]) {
+    for (const path of ["/health", "/v1/models"]) {
       assert.strictEqual((await app.fetch(get(path))).status, 401, path);
     }
     const anth = await app.fetch(post("/v1/messages", { model: "gpt-5" }));

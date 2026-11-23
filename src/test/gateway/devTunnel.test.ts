@@ -347,9 +347,12 @@ suite("devTunnel", () => {
   });
 
   test("client setup text has name and URL but no key", () => {
-    const text = clientSetupText("My PC#1", "https://x-1.jpe1.devtunnels.ms");
+    const text = clientSetupText(
+      "My PC#1",
+      "https://x-1.jpe1.devtunnels.ms/v1",
+    );
     assert.match(text, /Name: My-PC-1/);
-    assert.match(text, /URL: https:\/\/x-1\.jpe1\.devtunnels\.ms/);
+    assert.match(text, /URL: https:\/\/x-1\.jpe1\.devtunnels\.ms\/v1\n/);
     assert.match(text, /Manage Remote Gateways.*Add remote gateway/);
   });
 });

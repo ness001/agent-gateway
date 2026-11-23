@@ -7,11 +7,7 @@ import {
   settingsFromWire,
 } from "../protocol/core/settingsLog";
 import { attachParsedBody, lazyBody } from "../protocol/http/body";
-import {
-  createCodexModelsResponse,
-  createGatewayCatalog,
-  createModelsResponse,
-} from "./catalog";
+import { createCodexModelsResponse, createModelsResponse } from "./catalog";
 import {
   checkApiKey,
   extractPresentedApiKey,
@@ -35,6 +31,7 @@ import {
   requestIdFrom,
   runWithRequestContext,
 } from "./requestContext";
+import { MODEL_DISCOVERY_HEADER } from "./types";
 import type {
   CatalogEntry,
   ModelInfo,
@@ -54,7 +51,7 @@ export interface GatewayLogger {
 
 export interface GatewayAppDeps {
   getRegistry: () => CatalogEntry[];
-  /** Local (non-remote, deduplicated) models for `/v1/gateway/catalog`. */
+  /** Local models offered to gateway peers. */
   getLocalModels: () => ModelInfo[];
   /**
    * Handles a local inference request whose model has already been rewritten
@@ -126,7 +123,7 @@ const PATH_OPERATIONS: Record<string, ProtocolOperation> = {
   "/v1/chat/completions": "openai.chatCompletions",
 };
 
-const GET_PATHS = new Set(["/v1/models", "/health", "/v1/gateway/catalog"]);
+const GET_PATHS = new Set(["/v1/models", "/health"]);
 
 export const protocolForPath = (path: string): Protocol => {
   if (OPENAI_PATHS.has(path)) {
@@ -370,6 +367,10 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
         });
       }
       if (path === "/v1/models") {
+        c.header("Vary", MODEL_DISCOVERY_HEADER, { append: true });
+        if (c.req.header(MODEL_DISCOVERY_HEADER) === "1") {
+          return c.json(createModelsResponse(deps.getLocalModels(), true));
+        }
         const reg = deps.getRegistry();
         if (c.req.query("client_version")) {
           return c.json(createCodexModelsResponse(reg));
@@ -393,10 +394,7 @@ export function createGatewayApp(deps: GatewayAppDeps): Hono {
         }
         return c.json(createModelsResponse(advertised));
       }
-      if (path === "/health") {
-        return c.json(deps.getHealth() as object);
-      }
-      return c.json(createGatewayCatalog(deps.getLocalModels()));
+      return c.json(deps.getHealth() as object);
     }
 
     if (protocol === "gateway") {

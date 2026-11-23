@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 
-import { validateModelInfo } from "../gateway/discovery";
 import type { Gateway } from "../gateway/gateway";
 import { discoverRemote } from "../gateway/remote";
 import {
@@ -70,11 +69,7 @@ async function probe(name: string, url: string, apiKey: string | undefined) {
       location: vscode.ProgressLocation.Notification,
       title: `Probing ${url}...`,
     },
-    () =>
-      discoverRemote(
-        { name, url },
-        { apiKey, validate: validateModelInfo, attempts: 1 },
-      ),
+    () => discoverRemote({ name, url }, { apiKey, attempts: 1 }),
   );
 }
 
@@ -231,7 +226,7 @@ export async function addRemoteUpstream(
   const rawUrl = await vscode.window.showInputBox({
     title: "Add Remote Gateway (1/3)",
     prompt:
-      "Remote gateway or OpenAI-compatible server origin, e.g. a dev tunnel URL or http://127.0.0.1:4143",
+      "Remote API base URL, e.g. a shared dev tunnel URL or http://127.0.0.1:4143/v1",
     ignoreFocusOut: true,
     validateInput: (v) => {
       const r = validateRemoteUrl(v);
@@ -281,11 +276,7 @@ export async function addRemoteUpstream(
       location: vscode.ProgressLocation.Notification,
       title: `Probing ${url}...`,
     },
-    () =>
-      discoverRemote(
-        { name, url },
-        { apiKey: key, validate: validateModelInfo, attempts: 1 },
-      ),
+    () => discoverRemote({ name, url }, { apiKey: key, attempts: 1 }),
   );
   if (probe.state.status === "ready") {
     void vscode.window.showInformationMessage(

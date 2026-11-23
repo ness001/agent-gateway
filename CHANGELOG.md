@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.21.0
 
-- Add OpenAI-compatible servers as remote upstreams: when `/v1/gateway/catalog`
-  is missing, models are discovered from the standard `GET /v1/models` list.
-  Anthropic Messages, OpenAI Responses and Gemini requests to those models are
-  translated to Chat Completions, so every supported agent can use them.
+- Dev-tunnel sharing now copies an OpenAI-compatible base URL ending in `/v1`.
+  **Add Remote Gateway** accepts either the server origin or the `/v1` URL.
+- Discover remote models through `GET /v1/models` only. Agent Gateway peers
+  exchange native protocol metadata for direct forwarding. The old discovery
+  endpoint has been removed; update both gateways to retain native forwarding.
+- Use Chat Completions upstreams with Anthropic Messages, OpenAI Responses,
+  and Gemini clients through protocol translation.
 
 ## 0.20.0
 

@@ -61,7 +61,7 @@ async function probeStatus(
 /**
  * Identify who holds a port without disturbing it. The extension gateway answers
  * /health (200, or 401 when API-key protected); another local gateway that
- * serves /v1/models but returns 404 for /health and /v1/gateway/catalog.
+ * serves /v1/models but returns 404 for /health.
  */
 export async function probeOccupant(
   port: number,
@@ -79,14 +79,11 @@ export async function probeOccupant(
     return "extension";
   }
   if (health.status === 404) {
-    const [models, catalog] = await Promise.all([
-      probeStatus(port, "/v1/models", timeoutMs),
-      probeStatus(port, "/v1/gateway/catalog", timeoutMs),
-    ]);
+    const models = await probeStatus(port, "/v1/models", timeoutMs);
     const data = (models?.body as { data?: unknown } | undefined)?.data;
     const modelsLike =
       (models?.status === 200 && Array.isArray(data)) || models?.status === 401;
-    if (modelsLike && catalog?.status === 404) {
+    if (modelsLike) {
       return "other-gateway";
     }
   }

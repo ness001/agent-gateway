@@ -68,10 +68,4 @@ export type RemoteState =
   | { name: string; url: string; status: "ready"; modelCount: number }
   | { name: string; url: string; status: "skipped"; reason: string };
 
-/** `GET /v1/gateway/catalog` response body. */
-export interface GatewayCatalogResponse {
-  version: 1;
-  models: ModelInfo[];
-}
-
-export const GATEWAY_CATALOG_VERSION = 1;
+export const MODEL_DISCOVERY_HEADER = "x-agent-gateway-discovery";

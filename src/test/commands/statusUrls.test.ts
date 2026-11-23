@@ -138,15 +138,15 @@ suite("commands/status sharing", () => {
     }
   });
 
-  test("public catalog check authenticates, validates and counts models", async () => {
+  test("public model discovery authenticates and counts models from a /v1 base URL", async () => {
     const connection = new DevTunnelConnection();
     let release!: (response: Response) => void;
     const pending = new Promise<Response>((resolve) => {
       release = resolve;
     });
-    const checking = connection.check("https://example.test", "test-key", {
+    const checking = connection.check("https://example.test/v1", "test-key", {
       fetchImpl: async (url, init) => {
-        assert.strictEqual(url, "https://example.test/v1/gateway/catalog");
+        assert.strictEqual(url, "https://example.test/v1/models");
         assert.strictEqual(
           (init?.headers as Record<string, string>).authorization,
           "Bearer test-key",
@@ -167,14 +167,17 @@ suite("commands/status sharing", () => {
     };
     release(
       Response.json({
-        version: 1,
-        models: [model, { ...model, id: "other-model" }],
+        object: "list",
+        data: [
+          { id: model.id, agent_gateway: model },
+          { id: "other-model", agent_gateway: { ...model, id: "other-model" } },
+        ],
       }),
     );
     assert.strictEqual(await checking, true);
     assert.deepStrictEqual(connection.state, {
       status: "connected",
-      url: "https://example.test",
+      url: "https://example.test/v1",
       modelCount: 2,
     });
   });
@@ -182,7 +185,7 @@ suite("commands/status sharing", () => {
   test("failed checks use safe discovery reasons and reject invalid catalogs", async () => {
     for (const response of [
       new Response("private response body", { status: 403 }),
-      Response.json({ version: 1, models: [{ id: "invalid" }] }),
+      Response.json({ data: [{ id: "invalid", agent_gateway: {} }] }),
     ]) {
       const connection = new DevTunnelConnection();
       await connection.check("https://example.test", undefined, {
@@ -191,7 +194,7 @@ suite("commands/status sharing", () => {
       assert.strictEqual(connection.state.status, "checkFailed");
       assert.match(
         connection.state.reason ?? "",
-        /HTTP 403|invalid model entry/,
+        /HTTP 403|no valid model entries/,
       );
       assert.ok(!connection.state.reason?.includes("private response body"));
     }
@@ -209,9 +212,9 @@ suite("commands/status sharing", () => {
     connection.reset();
     assert.deepStrictEqual(connection.state, { status: "inactive" });
     await connection.check("https://new.example.test", undefined, {
-      fetchImpl: async () => Response.json({ version: 1, models: [] }),
+      fetchImpl: async () => Response.json({ object: "list", data: [] }),
     });
-    release(Response.json({ version: 1, models: [] }));
+    release(Response.json({ object: "list", data: [] }));
     assert.strictEqual(await checking, false);
     assert.deepStrictEqual(connection.state, {
       status: "connected",
@@ -226,7 +229,7 @@ suite("commands/status sharing", () => {
         }),
     });
     connection.reset();
-    releaseStopped(Response.json({ version: 1, models: [] }));
+    releaseStopped(Response.json({ object: "list", data: [] }));
     assert.strictEqual(await stopped, false);
     assert.deepStrictEqual(connection.state, { status: "inactive" });
   });
@@ -250,7 +253,7 @@ suite("commands/status sharing", () => {
         }),
     };
     const stopping = connection.stop(host);
-    release(Response.json({ version: 1, models: [] }));
+    release(Response.json({ object: "list", data: [] }));
     assert.strictEqual(await checking, false);
     const error = new Error("Host is still running");
     rejectStop(error);
@@ -287,7 +290,7 @@ suite("commands/status sharing", () => {
     await connection.stop(host);
     assert.strictEqual(host.active, false);
     assert.deepStrictEqual(connection.state, { status: "inactive" });
-    release(Response.json({ version: 1, models: [] }));
+    release(Response.json({ object: "list", data: [] }));
     assert.strictEqual(await checking, false);
     assert.deepStrictEqual(connection.state, { status: "inactive" });
   });
@@ -311,7 +314,7 @@ suite("commands/status sharing", () => {
       }),
       /Host is still running/,
     );
-    release(Response.json({ version: 1, models: [] }));
+    release(Response.json({ object: "list", data: [] }));
     assert.strictEqual(await checking, false);
     assert.deepStrictEqual(connection.state, { status: "stopFailed", url });
   });

@@ -39,7 +39,7 @@ export function parseRemoteUpstreams(value: unknown): {
     const origin = normalizeOrigin(url);
     if (!origin) {
       errors.push(
-        `${label}.url must be an HTTP(S) origin without credentials, path, query or fragment.`,
+        `${label}.url must be an HTTP(S) origin or /v1 base URL without credentials, query or fragment.`,
       );
       return;
     }
@@ -70,7 +70,7 @@ function normalizeOrigin(value: unknown): string | undefined {
     raw.includes("@") ||
     raw.includes("?") ||
     raw.includes("#") ||
-    (parsed.pathname !== "/" && parsed.pathname !== "")
+    (parsed.pathname !== "/" && parsed.pathname !== "/v1")
   ) {
     return undefined;
   }

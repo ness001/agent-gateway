@@ -56,7 +56,7 @@ export const cursorAdapter: ClientAdapter = {
     const steps: string[] = [];
     if (loopback) {
       steps.push(
-        `WARNING: ${input.gatewayUrl} is a loopback address. Cursor sends BYOK requests via its servers and cannot reach it. Run 'Agent Gateway: Share Gateway via Dev Tunnel' and use that public URL + /v1 instead.`,
+        `WARNING: ${input.gatewayUrl} is a loopback address. Cursor sends BYOK requests via its servers and cannot reach it. Run 'Agent Gateway: Share Gateway via Dev Tunnel' and use the shared API base URL instead.`,
       );
     }
     steps.push(

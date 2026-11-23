@@ -1,10 +1,5 @@
 import { resolveFallbackModel } from "./match";
-import {
-  CatalogEntry,
-  GATEWAY_CATALOG_VERSION,
-  GatewayCatalogResponse,
-  ModelInfo,
-} from "./types";
+import type { CatalogEntry, ModelInfo } from "./types";
 
 export const MODEL_CREATED_AT = "2026-08-14T00:00:00Z";
 export const ALIAS_PREFIX = "gateway-claude-";
@@ -74,6 +69,8 @@ export interface ModelsResponse {
     /** OpenAI-compatible extras for auto-discovering clients. */
     object: "model";
     owned_by: string;
+    created: number;
+    agent_gateway?: ModelInfo;
     context_length?: number;
     context_window?: number;
   }[];
@@ -83,7 +80,12 @@ export interface ModelsResponse {
   last_id: string | null;
 }
 
-export function createModelsResponse(reg: CatalogEntry[]): ModelsResponse {
+const MODEL_CREATED_SECONDS = Date.parse(MODEL_CREATED_AT) / 1000;
+
+export function createModelsResponse(
+  reg: (ModelInfo & { remote?: string })[],
+  peer = false,
+): ModelsResponse {
   const data = reg.map((e) => ({
     type: "model" as const,
     id: e.id,
@@ -91,6 +93,8 @@ export function createModelsResponse(reg: CatalogEntry[]): ModelsResponse {
     created_at: MODEL_CREATED_AT,
     object: "model" as const,
     owned_by: e.remote ?? "copilot",
+    created: MODEL_CREATED_SECONDS,
+    ...(peer ? { agent_gateway: e } : {}),
     ...(e.contextWindow !== null
       ? { context_length: e.contextWindow, context_window: e.contextWindow }
       : {}),
@@ -165,16 +169,6 @@ export function createCodexModelsResponse(reg: CatalogEntry[]): {
       max_context_window: e.contextWindow,
       experimental_supported_tools: [],
     })),
-  };
-}
-
-/** Only local models are exported, which prevents forwarding loops and chains. */
-export function createGatewayCatalog(
-  local: ModelInfo[],
-): GatewayCatalogResponse {
-  return {
-    version: GATEWAY_CATALOG_VERSION as 1,
-    models: local.map(cloneInfo),
   };
 }
 

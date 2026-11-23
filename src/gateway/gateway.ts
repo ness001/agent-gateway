@@ -14,7 +14,7 @@ import { createGatewayApp } from "./app";
 import { buildRegistry, summarizeModels } from "./catalog";
 import { createChatCompletionsModel } from "./chatCompletionsModel";
 import { BUILD_TIME, IS_DEV_VARIANT } from "./devVariant";
-import { dedupeModels, toModelInfo, validateModelInfo } from "./discovery";
+import { dedupeModels, toModelInfo } from "./discovery";
 import { ErrorJournal } from "./errorJournal";
 import {
   type GatewayStatus,
@@ -399,7 +399,6 @@ export class Gateway implements vscode.Disposable {
             (await this.context.secrets.get(
               remoteApiKeySecretKey(remote.name),
             )) || undefined,
-          validate: validateModelInfo,
         }),
       ),
     );
