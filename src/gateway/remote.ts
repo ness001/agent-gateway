@@ -1,9 +1,7 @@
 import { dedupeModels, fromOpenAIModel } from "./discovery";
 import type { ModelInfo, RemoteState, RemoteUpstreamConfig } from "./types";
-import { GATEWAY_CATALOG_VERSION } from "./types";
+import { MODEL_DISCOVERY_HEADER } from "./types";
 
-const CATALOG_PATH = "/v1/gateway/catalog";
-/** Standard OpenAI-compatible model list, used when the remote is not a gateway. */
 const MODELS_PATH = "/v1/models";
 const NOT_SUPPORTED = "not an Agent Gateway or OpenAI-compatible server";
 
@@ -13,8 +11,6 @@ class DiscoveryError extends Error {
   constructor(
     readonly reason: string,
     readonly transient: boolean,
-    /** The remote answered but is not an Agent Gateway; try `/v1/models`. */
-    readonly notGateway = false,
   ) {
     super(reason);
   }
@@ -26,7 +22,6 @@ export interface DiscoverRemoteOptions {
   attempts?: number;
   attemptTimeoutMs?: number;
   retryDelayMs?: number;
-  validate: (m: unknown) => ModelInfo;
 }
 
 export async function discoverRemote(
@@ -38,7 +33,7 @@ export async function discoverRemote(
   let lastReason = "Unexpected discovery failure.";
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const models = await fetchModels(remote, opts);
+      const models = parseModelList(await fetchModelList(remote, opts));
       return {
         state: {
           name: remote.name,
@@ -71,29 +66,16 @@ export async function discoverRemote(
   };
 }
 
-async function fetchModels(
+async function fetchModelList(
   remote: RemoteUpstreamConfig,
-  opts: DiscoverRemoteOptions,
-): Promise<ModelInfo[]> {
-  try {
-    const body = await fetchJson(remote, CATALOG_PATH, opts);
-    return parseCatalog(body, opts.validate);
-  } catch (error) {
-    if (!(error instanceof DiscoveryError) || !error.notGateway) {
-      throw error;
-    }
-  }
-  return parseModelList(await fetchJson(remote, MODELS_PATH, opts));
-}
-
-async function fetchJson(
-  remote: RemoteUpstreamConfig,
-  path: string,
   opts: DiscoverRemoteOptions,
 ): Promise<unknown> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const timeoutMs = opts.attemptTimeoutMs ?? 10_000;
-  const headers: Record<string, string> = { accept: "application/json" };
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    [MODEL_DISCOVERY_HEADER]: "1",
+  };
   if (opts.apiKey) {
     headers.authorization = `Bearer ${opts.apiKey}`;
   }
@@ -106,7 +88,7 @@ async function fetchJson(
   try {
     let response: Response;
     try {
-      response = await fetchImpl(`${remote.url}${path}`, {
+      response = await fetchImpl(`${remote.url}${MODELS_PATH}`, {
         headers,
         signal: controller.signal,
         redirect: "manual",
@@ -120,9 +102,8 @@ async function fetchJson(
       await response.body?.cancel().catch(() => undefined);
       const status = response.status;
       throw new DiscoveryError(
-        `GET ${path} returned HTTP ${status}: ${statusHint(status)}`,
+        `GET ${MODELS_PATH} returned HTTP ${status}: ${statusHint(status)}`,
         status === 408 || status === 429 || (status >= 500 && status <= 599),
-        status === 404,
       );
     }
     try {
@@ -132,54 +113,12 @@ async function fetchJson(
         throw timeoutError(timeoutMs);
       }
       throw new DiscoveryError(
-        `GET ${path} returned invalid JSON: ${NOT_SUPPORTED}.`,
+        `GET ${MODELS_PATH} returned invalid JSON: ${NOT_SUPPORTED}.`,
         false,
-        true,
       );
     }
   } finally {
     clearTimeout(timer);
-  }
-}
-
-function parseCatalog(
-  body: unknown,
-  validate: (m: unknown) => ModelInfo,
-): ModelInfo[] {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    throw new DiscoveryError(
-      `GET ${CATALOG_PATH} returned an unexpected document: not an Agent Gateway.`,
-      false,
-      true,
-    );
-  }
-  const { version, models } = body as Record<string, unknown>;
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new DiscoveryError(
-      `GET ${CATALOG_PATH} returned no catalogue version: not an Agent Gateway.`,
-      false,
-      true,
-    );
-  }
-  if (version !== GATEWAY_CATALOG_VERSION) {
-    throw new DiscoveryError(
-      `GET ${CATALOG_PATH} returned unsupported catalogue version ${version} (expected ${GATEWAY_CATALOG_VERSION}); update the extension on both machines.`,
-      false,
-    );
-  }
-  if (!Array.isArray(models)) {
-    throw new DiscoveryError(
-      `GET ${CATALOG_PATH} returned a catalogue without a models array.`,
-      false,
-    );
-  }
-  try {
-    return models.map((m) => validate(m));
-  } catch {
-    throw new DiscoveryError(
-      `GET ${CATALOG_PATH} returned an invalid model entry.`,
-      false,
-    );
   }
 }
 

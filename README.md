@@ -123,8 +123,10 @@ All commands are under **Agent Gateway** in the Command Palette.
 On the machine with Copilot, run **Share Gateway via Dev Tunnel**. It installs
 and signs in to the `devtunnel` CLI if needed, offers to create a gateway API
 key, and starts a tunnel whose URL stays the same across runs. Hosting runs in
-an extension-managed background process, not an integrated terminal. Use **Copy
-client setup** to send the URL (the key is never included).
+an extension-managed background process, not an integrated terminal. **Copy
+URL** gives you an OpenAI-compatible base URL ending in `/v1`. Use it in an
+OpenAI client or paste it into another Agent Gateway. **Copy client setup**
+adds setup instructions without including the key.
 
 The gateway checks the public connection automatically. **Status** shows
 **Connecting**, then **Connected** with the discovered model count, or the
@@ -169,7 +171,7 @@ Search queries, results and page text are never logged.
 | ---------------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
 | `agentGateway.enabled`                         | `true`              | Run the gateway.                                                              |
 | `agentGateway.port`                            | `24444`             | Local port. Use **Change Port** to change it safely.                          |
-| `agentGateway.logLevel`                        | `info`              | `error`, `warning`, `info` or `debug`.                                           |
+| `agentGateway.logLevel`                        | `info`              | `error`, `warning`, `info` or `debug`.                                        |
 | `agentGateway.remoteUpstreams`                 | `[]`                | Other machines' gateways (managed by **Manage Remote Gateways**).             |
 | `agentGateway.webSearch.provider`              | `none`              | Web search engine (managed by **Set Web Search Engine**).                     |
 | `agentGateway.webSearch.maxSearchesPerRequest` | `5`                 | Most searches per request (1-20).                                             |

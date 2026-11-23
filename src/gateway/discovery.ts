@@ -395,6 +395,13 @@ export function fromOpenAIModel(value: unknown): ModelInfo {
   ) {
     throw new InvalidModelMetadataError("Model list entry has an invalid id.");
   }
+  if (has(value, "agent_gateway")) {
+    const model = validateModelInfo(value.agent_gateway);
+    if (model.id !== value.id) {
+      invalid("id");
+    }
+    return model;
+  }
   // Third-party lists use several names for capacity; ignore unusable values.
   const contextWindow = OPENAI_CONTEXT_KEYS.map((k) => value[k]).find(
     (v): v is number =>

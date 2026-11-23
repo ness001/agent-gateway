@@ -277,14 +277,12 @@ credentials are never logged.
 
 ## Remote upstreams
 
-A remote upstream is another machine's Agent Gateway, usually reached through a
-dev tunnel, or an OpenAI-compatible server. It is probed with
-`GET /v1/gateway/catalog` before it is saved. If that path is missing or does
-not return a gateway catalogue, the standard `GET /v1/models` list is used
-instead. Chat Completions requests are forwarded to such a server unchanged;
-Anthropic Messages, OpenAI Responses and Gemini requests are translated to
-Chat Completions, so every supported agent can use its models. The URL must be
-the server origin without `/v1`.
+A remote upstream is another machine's Agent Gateway or an OpenAI-compatible
+server. Enter its origin or its `/v1` base URL. Discovery uses `GET /v1/models`.
+Agent Gateway peers request local models and their native protocols with
+`X-Agent-Gateway-Discovery: 1`. For servers without capability metadata, the
+gateway forwards Chat Completions and translates Anthropic Messages, OpenAI
+Responses, and Gemini requests. Update both gateways for native forwarding.
 Models are listed as `<name>--<model>` and requests are forwarded with the
 remote's API key. A remote that is down is skipped and local models keep
 working.

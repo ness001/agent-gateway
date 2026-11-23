@@ -11,7 +11,6 @@ import {
   clientSetupText,
   findDevTunnelCli,
 } from "../gateway/devTunnel";
-import { validateModelInfo } from "../gateway/discovery";
 import type { Gateway } from "../gateway/gateway";
 import { type DiscoverRemoteOptions, discoverRemote } from "../gateway/remote";
 import { LLM_API_KEY_SECRET_KEY } from "../utils/constant";
@@ -166,14 +165,13 @@ export class DevTunnelConnection {
     const session = ++this.session;
     this.current = { status: "connecting", url };
     const { state } = await discoverRemote(
-      { name: "shared-gateway", url },
+      { name: "shared-gateway", url: new URL(url).origin },
       {
         apiKey,
         attempts: 3,
         attemptTimeoutMs: 5000,
         retryDelayMs: 1000,
         ...options,
-        validate: validateModelInfo,
       },
     );
     if (session !== this.session) {
@@ -244,11 +242,7 @@ export async function stopDevTunnelHosting(): Promise<void> {
 }
 
 export type ShareAction =
-  | "copyUrl"
-  | "copySetup"
-  | "stop"
-  | "setKey"
-  | "removeKey";
+  "copyUrl" | "copySetup" | "stop" | "setKey" | "removeKey";
 
 /** Actions offered while a tunnel is hosted. */
 export function shareActionItems(
@@ -458,7 +452,8 @@ async function startSharing(
         ),
     );
     await context.globalState.update(TUNNEL_ID_STATE_KEY, result.tunnelId);
-    await context.globalState.update(TUNNEL_URL_STATE_KEY, result.url);
+    const baseUrl = `${new URL(result.url).origin}/v1`;
+    await context.globalState.update(TUNNEL_URL_STATE_KEY, baseUrl);
     const apiKey = await context.secrets.get(LLM_API_KEY_SECRET_KEY);
     await host.start(cliPath, result.tunnelId);
     if (!host.active) {
@@ -473,7 +468,7 @@ async function startSharing(
         title:
           "Dev tunnel: Connecting… Run Share Gateway via Dev Tunnel to stop sharing.",
       },
-      () => connection.check(result.url, apiKey),
+      () => connection.check(baseUrl, apiKey),
     );
     if (!checked || !host.active) {
       return;
@@ -488,20 +483,20 @@ async function startSharing(
       return;
     }
     logger.info(
-      `Dev tunnel public catalog check succeeded (${connection.state.modelCount} models).`,
+      `Dev tunnel public model discovery succeeded (${connection.state.modelCount} models).`,
     );
     void vscode.window
       .showInformationMessage(
-        `Dev tunnel: Connected (${connection.state.modelCount} models). Tunnel URL: ${result.url}. Run this command again to stop sharing.`,
+        `Dev tunnel: Connected (${connection.state.modelCount} models). API base URL: ${baseUrl}. Run this command again to stop sharing.`,
         "Copy URL",
         "Copy client setup",
       )
       .then((pick) => {
         if (pick === "Copy URL") {
-          return vscode.env.clipboard.writeText(result.url);
+          return vscode.env.clipboard.writeText(baseUrl);
         } else if (pick === "Copy client setup") {
           return vscode.env.clipboard.writeText(
-            clientSetupText(os.hostname(), result.url),
+            clientSetupText(os.hostname(), baseUrl),
           );
         }
         return undefined;

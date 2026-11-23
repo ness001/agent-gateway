@@ -12,16 +12,9 @@ const model: ModelInfo = {
   contextWindow: 128000,
   inputModalities: ["text"],
   supportsToolCalling: true,
-  defaultReasoningLevel: "",
+  defaultReasoningLevel: "medium",
   supportedReasoningLevels: [],
   operations: ["openai.chatCompletions"],
-};
-
-const validate = (m: unknown): ModelInfo => {
-  if (typeof (m as ModelInfo)?.id !== "string") {
-    throw new Error("bad");
-  }
-  return m as ModelInfo;
 };
 
 async function startServer(
@@ -44,7 +37,7 @@ suite("parseRemoteUpstreams", () => {
   test("accepts valid entries and trims trailing slash", () => {
     const r = parseRemoteUpstreams([
       { name: "devbox", url: "https://abc-24444.usw2.devtunnels.ms/" },
-      { name: "Devbox", url: "http://127.0.0.1:1234" },
+      { name: "Devbox", url: "http://127.0.0.1:1234/v1/" },
     ]);
     assert.deepStrictEqual(r.errors, []);
     assert.deepStrictEqual(r.upstreams, [
@@ -79,7 +72,7 @@ suite("parseRemoteUpstreams", () => {
 });
 
 suite("discoverRemote", () => {
-  const fast = { attemptTimeoutMs: 300, retryDelayMs: 10, validate };
+  const fast = { attemptTimeoutMs: 300, retryDelayMs: 10 };
 
   test("success sends bearer and returns models", async () => {
     let auth: string | undefined;
@@ -88,7 +81,12 @@ suite("discoverRemote", () => {
       auth = req.headers.authorization;
       path = req.url;
       res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ version: 1, models: [model] }));
+      res.end(
+        JSON.stringify({
+          object: "list",
+          data: [{ id: model.id, agent_gateway: model }],
+        }),
+      );
     });
     try {
       const r = await discoverRemote(
@@ -98,7 +96,7 @@ suite("discoverRemote", () => {
       assert.strictEqual(r.state.status, "ready");
       assert.deepStrictEqual(r.models, [model]);
       assert.strictEqual(auth, "Bearer k1");
-      assert.strictEqual(path, "/v1/gateway/catalog");
+      assert.strictEqual(path, "/v1/models");
     } finally {
       await s.close();
     }
@@ -108,7 +106,7 @@ suite("discoverRemote", () => {
     let auth: string | undefined = "x";
     const s = await startServer((req, res) => {
       auth = req.headers.authorization;
-      res.end(JSON.stringify({ version: 1, models: [] }));
+      res.end(JSON.stringify({ object: "list", data: [] }));
     });
     try {
       await discoverRemote({ name: "a", url: s.url }, fast);
@@ -119,7 +117,7 @@ suite("discoverRemote", () => {
   });
 
   for (const [status, text, expectedCalls] of [
-    [404, "not an Agent Gateway or OpenAI-compatible server", 2],
+    [404, "not an Agent Gateway or OpenAI-compatible server", 1],
     [401, "API key", 1],
   ] as const) {
     test(`HTTP ${status} skipped without retry or body leak`, async () => {
@@ -152,7 +150,12 @@ suite("discoverRemote", () => {
         res.end();
         return;
       }
-      res.end(JSON.stringify({ version: 1, models: [model] }));
+      res.end(
+        JSON.stringify({
+          object: "list",
+          data: [{ id: model.id, agent_gateway: model }],
+        }),
+      );
     });
     try {
       const r = await discoverRemote({ name: "a", url: s.url }, fast);
@@ -197,13 +200,13 @@ suite("discoverRemote", () => {
         r.state.status === "skipped" ? r.state.reason : "",
         /invalid JSON/,
       );
-      assert.strictEqual(calls, 2);
+      assert.strictEqual(calls, 1);
     } finally {
       await s.close();
     }
   });
 
-  test("falls back to an OpenAI-compatible /v1/models list", async () => {
+  test("discovers a plain OpenAI-compatible /v1/models list", async () => {
     const paths: string[] = [];
     const auths: (string | undefined)[] = [];
     const s = await startServer((req, res) => {
@@ -237,8 +240,8 @@ suite("discoverRemote", () => {
         { ...fast, apiKey: "k1" },
       );
       assert.strictEqual(r.state.status, "ready");
-      assert.deepStrictEqual(paths, ["/v1/gateway/catalog", "/v1/models"]);
-      assert.deepStrictEqual(auths, ["Bearer k1", "Bearer k1"]);
+      assert.deepStrictEqual(paths, ["/v1/models"]);
+      assert.deepStrictEqual(auths, ["Bearer k1"]);
       assert.deepStrictEqual(
         r.models.map((m) => [
           m.id,
@@ -278,15 +281,17 @@ suite("discoverRemote", () => {
     }
   });
 
-  test("version 2 rejected", async () => {
+  test("rejects mismatched gateway metadata IDs", async () => {
     const s = await startServer((_req, res) => {
-      res.end(JSON.stringify({ version: 2, models: [] }));
+      res.end(
+        JSON.stringify({ data: [{ id: "wrong-id", agent_gateway: model }] }),
+      );
     });
     try {
       const r = await discoverRemote({ name: "a", url: s.url }, fast);
       assert.match(
         r.state.status === "skipped" ? r.state.reason : "",
-        /unsupported catalogue version 2/,
+        /no valid model entries/,
       );
     } finally {
       await s.close();

@@ -3,7 +3,6 @@ import * as assert from "assert";
 import {
   buildRegistry,
   createCodexModelsResponse,
-  createGatewayCatalog,
   createModelsResponse,
   summarizeModels,
 } from "../../gateway/catalog";
@@ -116,6 +115,7 @@ suite("Gateway catalogue", () => {
         id: "gpt-5.6-sol[1m]",
         display_name: "GPT 5.6 Sol (1M)",
         created_at: "2026-08-14T00:00:00Z",
+        created: Date.parse("2026-08-14T00:00:00Z") / 1000,
         object: "model",
         owned_by: "copilot",
         ...(reg[0].contextWindow !== null
@@ -268,19 +268,6 @@ suite("Gateway catalogue", () => {
       );
       const json = JSON.parse(JSON.stringify(createCodexModelsResponse(reg)));
       assert.deepStrictEqual(json.models[0].supported_reasoning_levels, []);
-    });
-  });
-
-  suite("createGatewayCatalog", () => {
-    test("returns version 1 with only the local models", () => {
-      const local = [m("a"), m("b")];
-      const cat = createGatewayCatalog(local);
-      assert.strictEqual(cat.version, 1);
-      assert.deepStrictEqual(
-        cat.models.map((x) => x.id),
-        ["a", "b"],
-      );
-      assert.notStrictEqual(cat.models[0], local[0]);
     });
   });
 
