@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.21.0
+## 0.20.1
 
 - Dev-tunnel sharing now copies an OpenAI-compatible base URL ending in `/v1`.
   **Add Remote Gateway** accepts either the server origin or the `/v1` URL.
