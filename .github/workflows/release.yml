@@ -53,7 +53,7 @@ jobs:
       - name: Package VSIX
         run: pnpm exec vsce package --no-dependencies -o agent-gateway-${{ github.ref_name }}.vsix
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: agent-gateway-${{ github.ref_name }}.vsix
           generate_release_notes: true
